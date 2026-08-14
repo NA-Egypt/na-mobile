@@ -8,53 +8,75 @@ import {
   Modal,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Lock, LogOut, FileText, X, ShieldAlert, CheckCircle2, Eye, FolderX, Calendar, User, Users } from 'lucide-react-native';
+import {
+  Lock,
+  LogOut,
+  FileText,
+  X,
+  ShieldAlert,
+  CheckCircle2,
+  Eye,
+  FolderX,
+  Calendar,
+  User,
+  Users,
+  Building2,
+  FileArchive,
+  DownloadCloud,
+  Layers,
+} from 'lucide-react-native';
 import { authApi, UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
 import { colors, spacing, borderRadius, typography, shadows } from '../../src/theme';
+
+type AgendaTabType = 'groups' | 'service_bodies' | 'committees_archive';
 
 export default function AgendasScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const router = useRouter();
 
+  const [activeTab, setActiveTab] = useState<AgendaTabType>('groups');
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [agendas, setAgendas] = useState<any[]>([]);
+
+  const [groupAgendas, setGroupAgendas] = useState<any[]>([]);
+  const [serviceBodyAgendas, setServiceBodyAgendas] = useState<any[]>([]);
+  const [committeeReports, setCommitteeReports] = useState<any[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedAgenda, setSelectedAgenda] = useState<any | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
-  const fetchLiveAgendas = async () => {
+  const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [agendasRes, serviceAgendasRes] = await Promise.allSettled([
+      const [agendasRes, sbRes, reportsRes] = await Promise.allSettled([
         apiClient.get('/agendas'),
         apiClient.get('/service-body-agendas'),
+        apiClient.get('/committee-reports'),
       ]);
-
-      const items: any[] = [];
 
       if (agendasRes.status === 'fulfilled') {
         const data = agendasRes.value.data?.data || agendasRes.value.data || [];
-        if (Array.isArray(data)) {
-          items.push(...data);
-        }
+        setGroupAgendas(Array.isArray(data) ? data : []);
       }
 
-      if (serviceAgendasRes.status === 'fulfilled') {
-        const data = serviceAgendasRes.value.data?.data || serviceAgendasRes.value.data || [];
-        if (Array.isArray(data)) {
-          items.push(...data);
-        }
+      if (sbRes.status === 'fulfilled') {
+        const data = sbRes.value.data?.data || sbRes.value.data || [];
+        setServiceBodyAgendas(Array.isArray(data) ? data : []);
       }
 
-      setAgendas(items);
+      if (reportsRes.status === 'fulfilled') {
+        const data = reportsRes.value.data?.data || reportsRes.value.data || [];
+        setCommitteeReports(Array.isArray(data) ? data : []);
+      }
     } catch (e) {
-      console.warn('Error fetching live agendas:', e);
+      console.warn('Error loading agendas/reports:', e);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -64,37 +86,95 @@ export default function AgendasScreen() {
   useEffect(() => {
     authApi.getStoredUser().then((stored) => {
       setUser(stored);
-      fetchLiveAgendas();
+      fetchAllData();
     });
   }, []);
 
   const handleLogout = async () => {
     await authApi.logout();
     setUser(null);
+    fetchAllData();
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchLiveAgendas();
+    await fetchAllData();
   };
+
+  // Check user permissions
+  const hasPermission = (permissionName: string) => {
+    if (!user) return false;
+    if (user.roles?.includes('admin') || user.roles?.includes('super_admin')) return true;
+    return user.permissions?.includes(permissionName) || false;
+  };
+
+  const currentList =
+    activeTab === 'groups'
+      ? groupAgendas
+      : activeTab === 'service_bodies'
+      ? serviceBodyAgendas
+      : committeeReports;
 
   return (
     <View style={styles.screenWrapper}>
       <SafeAreaView style={styles.safeHeader} edges={['top']}>
+        {/* Header Banner */}
         <View style={styles.headerBanner}>
           <View style={styles.iconCircle}>
-            <FileText size={22} color="#ffffff" />
+            <Layers size={22} color="#ffffff" />
           </View>
           <View style={styles.headerTextCol}>
             <Text style={[styles.headerTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'جداول الأعمال والتقارير الخدمية' : 'Agendas & Service Reports'}
+              {isAr ? 'جداول الأعمال والأرشيف الخدمي' : 'Agendas & Service Archive'}
             </Text>
             <Text style={[styles.headerSubtitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
               {isAr
-                ? 'تقارير مجموعات الزمالة ومحاضر اجتماعات الهيئات الخدمية'
-                : 'Group Agendas, Meeting Reports & Service Body Records'}
+                ? 'أجندات المجموعات، الهيئات الخدمية، وأرشيف تقارير اللجان الفرعية'
+                : 'Group Agendas, Service Bodies & Committee Archive'}
             </Text>
           </View>
+        </View>
+
+        {/* 3-Tab Segmented Selector */}
+        <View style={styles.tabSelectorWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabSelectorContainer}
+          >
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'groups' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('groups')}
+              activeOpacity={0.8}
+            >
+              <FileText size={15} color={activeTab === 'groups' ? '#ffffff' : 'rgba(255,255,255,0.85)'} style={{ marginEnd: 6 }} />
+              <Text style={[styles.tabButtonText, activeTab === 'groups' && styles.tabButtonTextActive]}>
+                {isAr ? 'أجندات المجموعات' : 'Group Agendas'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'service_bodies' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('service_bodies')}
+              activeOpacity={0.8}
+            >
+              <Building2 size={15} color={activeTab === 'service_bodies' ? '#ffffff' : 'rgba(255,255,255,0.85)'} style={{ marginEnd: 6 }} />
+              <Text style={[styles.tabButtonText, activeTab === 'service_bodies' && styles.tabButtonTextActive]}>
+                {isAr ? 'الهيئات الخدمية' : 'Service Bodies'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'committees_archive' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('committees_archive')}
+              activeOpacity={0.8}
+            >
+              <FileArchive size={15} color={activeTab === 'committees_archive' ? '#ffffff' : 'rgba(255,255,255,0.85)'} style={{ marginEnd: 6 }} />
+              <Text style={[styles.tabButtonText, activeTab === 'committees_archive' && styles.tabButtonTextActive]}>
+                {isAr ? 'أرشيف اللجان' : 'Committees Archive'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </SafeAreaView>
 
@@ -107,7 +187,7 @@ export default function AgendasScreen() {
             </View>
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {user.name || (isAr ? 'خادم معتمد' : 'Trusted Servant')}
+                {user.name || (isAr ? 'خادم زمالة معتمد' : 'Trusted Servant')}
               </Text>
               <Text style={[styles.userEmail, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
                 {user.email}
@@ -124,10 +204,12 @@ export default function AgendasScreen() {
             </View>
             <View style={styles.lockInfo}>
               <Text style={[styles.lockTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'بوابة خادمي المجموعات' : 'Trusted Servants Portal'}
+                {isAr ? 'بوابة خادمي اللجان والمجموعات' : 'Trusted Servants Portal'}
               </Text>
               <Text style={[styles.lockSubtitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على التقارير' : 'Sign in with Microsoft to access reports'}
+                {isAr
+                  ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف اللجان وجداول الأعمال المعتمدة'
+                  : 'Sign in with Microsoft to access verified committee records'}
               </Text>
             </View>
             <TouchableOpacity
@@ -141,159 +223,241 @@ export default function AgendasScreen() {
         )}
       </View>
 
+      {/* Main List Area */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-            {isAr ? 'جاري جلب جداول الأعمال من الخادم...' : 'Loading agendas from server...'}
+            {isAr ? 'جاري جلب البيانات من الخادم...' : 'Loading data from server...'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={agendas}
+          data={currentList}
           keyExtractor={(item, index) => String(item.id || index)}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
           }
           renderItem={({ item }) => {
-            const dateStr = item.agenda_date || item.created_at || '';
-            const submitter = item.submitter_name || (isAr ? 'غير محدد' : 'N/A');
-            const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
-            const meetingsCount = item.meetings_per_week ? `${item.meetings_per_week} ${isAr ? 'اجتماعات/أسبوع' : 'meetings/week'}` : '';
+            if (activeTab === 'groups') {
+              // Group Agenda Item
+              const dateStr = item.agenda_date || item.created_at || '';
+              const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
+              const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
 
-            return (
-              <View style={[styles.card, shadows.card]}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={styles.positionBadge}>
-                    <Text style={styles.positionText}>{position}</Text>
-                  </View>
-                  {dateStr ? (
-                    <View style={styles.dateBadge}>
-                      <Calendar size={12} color="#0891b2" style={{ marginEnd: 4 }} />
-                      <Text style={styles.dateText}>{dateStr.slice(0, 10)}</Text>
+              return (
+                <View style={[styles.card, shadows.card]}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.positionBadge}>
+                      <Text style={styles.positionText}>{position}</Text>
                     </View>
-                  ) : null}
-                </View>
+                    {dateStr ? (
+                      <View style={styles.dateBadge}>
+                        <Calendar size={12} color="#0891b2" style={{ marginEnd: 4 }} />
+                        <Text style={styles.dateText}>{dateStr.slice(0, 10)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
 
-                <Text style={[styles.agendaTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                  {isAr ? `جدول أعمال مجموعة رقم #${item.group_id || item.id}` : `Group Agenda #${item.group_id || item.id}`}
-                </Text>
+                  <Text style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {isAr ? `جدول أعمال مجموعة #${item.group_id || item.id}` : `Group Agenda #${item.group_id || item.id}`}
+                  </Text>
 
-                <View style={styles.infoGrid}>
-                  <View style={styles.infoItem}>
+                  <View style={styles.infoRow}>
                     <User size={14} color={colors.primary} style={{ marginEnd: 4 }} />
                     <Text style={[styles.infoLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                      {isAr ? `المقدم: ${submitter}` : `Submitter: ${submitter}`}
+                      {isAr ? `مقدم التقرير: ${submitter}` : `Submitter: ${submitter}`}
                     </Text>
                   </View>
 
-                  {meetingsCount ? (
-                    <View style={styles.infoItem}>
+                  {item.meetings_per_week ? (
+                    <View style={styles.infoRow}>
                       <Users size={14} color={colors.primary} style={{ marginEnd: 4 }} />
                       <Text style={[styles.infoLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                        {meetingsCount}
+                        {isAr ? `${item.meetings_per_week} اجتماعات أسبوعياً` : `${item.meetings_per_week} meetings/week`}
                       </Text>
                     </View>
                   ) : null}
-                </View>
 
-                {item.new_comers !== undefined && item.new_comers !== null ? (
-                  <View style={styles.newcomersBox}>
-                    <Text style={[styles.newcomersText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                      {isAr ? `عدد القادمين الجدد (Newcomers): ${item.new_comers}` : `Newcomers count: ${item.new_comers}`}
+                  <TouchableOpacity
+                    style={styles.viewDetailsBtn}
+                    onPress={() => setSelectedItem({ ...item, modalType: 'group' })}
+                    activeOpacity={0.85}
+                  >
+                    <Eye size={15} color="#ffffff" style={{ marginEnd: 6 }} />
+                    <Text style={styles.viewDetailsText}>{isAr ? 'عرض التفاصيل الكاملة' : 'View Details'}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            } else if (activeTab === 'service_bodies') {
+              // Service Body Agenda Item
+              const title = item.title || item.name || (isAr ? 'جدول أعمال هيئة خدمية' : 'Service Body Agenda');
+              const sbName = item.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee');
+              const status = item.status || 'submitted';
+
+              return (
+                <View style={[styles.card, shadows.card]}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={[styles.statusBadge, status === 'approved' ? styles.statusApproved : styles.statusSubmitted]}>
+                      <Text style={[styles.statusBadgeText, status === 'approved' ? styles.statusApprovedText : styles.statusSubmittedText]}>
+                        {status === 'approved' ? (isAr ? 'معتمد' : 'Approved') : (isAr ? 'مقدم' : 'Submitted')}
+                      </Text>
+                    </View>
+                    {item.created_at ? (
+                      <Text style={styles.dateText}>{item.created_at.slice(0, 10)}</Text>
+                    ) : null}
+                  </View>
+
+                  <Text style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {title}
+                  </Text>
+
+                  <View style={styles.infoRow}>
+                    <Building2 size={14} color={colors.primary} style={{ marginEnd: 4 }} />
+                    <Text style={[styles.infoLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                      {sbName}
                     </Text>
                   </View>
-                ) : null}
 
-                <TouchableOpacity
-                  style={styles.viewDetailsBtn}
-                  onPress={() => setSelectedAgenda(item)}
-                  activeOpacity={0.85}
-                >
-                  <Eye size={15} color="#ffffff" style={{ marginEnd: 6 }} />
-                  <Text style={styles.viewDetailsText}>
-                    {isAr ? 'عرض التفاصيل الكاملة' : 'View Full Details'}
+                  <TouchableOpacity
+                    style={styles.viewDetailsBtn}
+                    onPress={() => setSelectedItem({ ...item, modalType: 'service_body' })}
+                    activeOpacity={0.85}
+                  >
+                    <Eye size={15} color="#ffffff" style={{ marginEnd: 6 }} />
+                    <Text style={styles.viewDetailsText}>{isAr ? 'عرض محضر الاجتماع' : 'View Minutes'}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            } else {
+              // Committee Reports Archive Item
+              const title = item.title || item.name || (isAr ? 'تقرير لجنة فرعية' : 'Committee Report');
+              const committeeName = item.committee_name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee');
+              const isApproved = item.status === 'approved';
+
+              return (
+                <View style={[styles.card, shadows.card]}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.committeeBadge}>
+                      <Text style={styles.committeeText}>{committeeName}</Text>
+                    </View>
+                    <View style={[styles.statusBadge, isApproved ? styles.statusApproved : styles.statusSubmitted]}>
+                      <Text style={[styles.statusBadgeText, isApproved ? styles.statusApprovedText : styles.statusSubmittedText]}>
+                        {isApproved ? (isAr ? 'أرشيف معتمد' : 'Approved') : (isAr ? 'مقدم' : 'Submitted')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {title}
                   </Text>
-                </TouchableOpacity>
-              </View>
-            );
+
+                  {item.description ? (
+                    <Text style={[styles.itemDescription, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                      {item.description}
+                    </Text>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={styles.viewDetailsBtn}
+                    onPress={() => setSelectedItem({ ...item, modalType: 'committee' })}
+                    activeOpacity={0.85}
+                  >
+                    <DownloadCloud size={15} color="#ffffff" style={{ marginEnd: 6 }} />
+                    <Text style={styles.viewDetailsText}>{isAr ? 'قراءة وتحميل الوثيقة' : 'View & Download Document'}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <FolderX size={52} color={colors.textMuted} />
               <Text style={[styles.emptyTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'لا توجد جداول أعمال مسجلة حالياً' : 'No agendas currently registered'}
+                {user
+                  ? isAr
+                    ? 'لا توجد سجلات مسجلة في هذا القسم حالياً'
+                    : 'No records found in this section'
+                  : isAr
+                  ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على السجلات'
+                  : 'Sign in with Microsoft to access records'}
               </Text>
               <Text style={[styles.emptySubtitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
                 {isAr
-                  ? 'يتم عرض جداول أعمال المجموعات وتقارير الهيئات الخدمية فور إدراجها على الخادم.'
-                  : 'Agendas will appear here once submitted on egyptna.org.'}
+                  ? 'يتم مزامنة تقارير وأرشيف اللجان وجداول الأعمال مباشرة من قاعدة بيانات egyptna.org.'
+                  : 'Agendas and Committee records synchronize directly from egyptna.org.'}
               </Text>
             </View>
           }
         />
       )}
 
-      {/* Agenda Detail Modal */}
+      {/* Details & Document Viewer Modal */}
       <Modal
-        visible={!!selectedAgenda}
+        visible={!!selectedItem}
         animationType="slide"
-        onRequestClose={() => setSelectedAgenda(null)}
+        onRequestClose={() => setSelectedItem(null)}
       >
         <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr
-                ? `تفاصيل جدول الأعمال #${selectedAgenda?.id}`
-                : `Agenda Details #${selectedAgenda?.id}`}
+            <Text style={[styles.modalTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+              {selectedItem?.title || selectedItem?.name || `تقرير #${selectedItem?.id}`}
             </Text>
-            <TouchableOpacity onPress={() => setSelectedAgenda(null)} hitSlop={10}>
+            <TouchableOpacity onPress={() => setSelectedItem(null)} hitSlop={10}>
               <X size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
             <View style={[styles.modalCard, shadows.card]}>
               <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'التاريخ:' : 'Date:'}
+                {isAr ? 'العنوان / التعريف:' : 'Title / Identifier:'}
               </Text>
               <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {selectedAgenda?.agenda_date || selectedAgenda?.created_at || 'N/A'}
+                {selectedItem?.title || selectedItem?.name || `سجل رقم #${selectedItem?.id}`}
               </Text>
 
-              <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'مقدم التقرير:' : 'Submitter:'}
-              </Text>
-              <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {selectedAgenda?.submitter_name || 'N/A'}
-              </Text>
-
-              <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'الصفة الخدمية:' : 'Service Position:'}
-              </Text>
-              <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {selectedAgenda?.service_position || 'N/A'}
-              </Text>
-
-              {selectedAgenda?.meetings_per_week ? (
+              {selectedItem?.agenda_date || selectedItem?.created_at ? (
                 <>
                   <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                    {isAr ? 'عدد الاجتماعات أسبوعياً:' : 'Meetings / Week:'}
+                    {isAr ? 'التاريخ:' : 'Date:'}
                   </Text>
                   <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                    {selectedAgenda.meetings_per_week}
+                    {(selectedItem?.agenda_date || selectedItem?.created_at || '').slice(0, 10)}
                   </Text>
                 </>
               ) : null}
 
-              {selectedAgenda?.new_comers !== undefined ? (
+              {selectedItem?.submitter_name ? (
                 <>
                   <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                    {isAr ? 'القادمون الجدد:' : 'Newcomers:'}
+                    {isAr ? 'مقدم التقرير:' : 'Submitter:'}
                   </Text>
                   <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                    {selectedAgenda.new_comers}
+                    {selectedItem.submitter_name}
+                  </Text>
+                </>
+              ) : null}
+
+              {selectedItem?.service_position ? (
+                <>
+                  <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {isAr ? 'الصفة الخدمية:' : 'Service Position:'}
+                  </Text>
+                  <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {selectedItem.service_position}
+                  </Text>
+                </>
+              ) : null}
+
+              {selectedItem?.description ? (
+                <>
+                  <Text style={[styles.modalFieldLabel, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {isAr ? 'البيان / التفاصيل:' : 'Details:'}
+                  </Text>
+                  <Text style={[styles.modalFieldValue, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    {selectedItem.description}
                   </Text>
                 </>
               ) : null}
@@ -301,11 +465,11 @@ export default function AgendasScreen() {
               <View style={styles.officialBadge}>
                 <ShieldAlert size={14} color={colors.primary} style={{ marginEnd: 4 }} />
                 <Text style={styles.officialBadgeText}>
-                  {isAr ? 'سجل معتمد من قاعدة بيانات زمالة NA مصر' : 'Verified NA Egypt Record'}
+                  {isAr ? 'وثيقة رسمية معتمدة من زمالة NA مصر' : 'Official Document - NA Egypt'}
                 </Text>
               </View>
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </View>
@@ -325,7 +489,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
   },
   iconCircle: {
     width: 40,
@@ -348,6 +513,38 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: 'rgba(255,255,255,0.75)',
     marginTop: 2,
+  },
+  tabSelectorWrapper: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 14,
+    padding: 3,
+    gap: 4,
+  },
+  tabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm - 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 11,
+  },
+  tabButtonActive: {
+    backgroundColor: '#ffffff',
+  },
+  tabButtonText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+  },
+  tabButtonTextActive: {
+    color: colors.primary,
   },
   authStatusContainer: {
     paddingHorizontal: spacing.md,
@@ -469,6 +666,40 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
   },
+  committeeBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+  },
+  committeeText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primary,
+    fontSize: 11,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+  },
+  statusApproved: {
+    backgroundColor: '#e6f4ea',
+  },
+  statusSubmitted: {
+    backgroundColor: '#fff7ed',
+  },
+  statusBadgeText: {
+    ...typography.caption,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  statusApprovedText: {
+    color: colors.success,
+  },
+  statusSubmittedText: {
+    color: colors.warning,
+  },
   dateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,38 +714,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 11,
   },
-  agendaTitle: {
+  itemTitle: {
     ...typography.h3,
     color: colors.primary,
     marginVertical: spacing.xs + 2,
   },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginVertical: spacing.xs,
+  itemDescription: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    lineHeight: 20,
   },
-  infoItem: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: spacing.xs,
   },
   infoLabel: {
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
-  },
-  newcomersBox: {
-    backgroundColor: '#f8fafc',
-    padding: spacing.sm,
-    borderRadius: borderRadius.sm,
-    marginVertical: spacing.xs,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.accent,
-  },
-  newcomersText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '600',
   },
   viewDetailsBtn: {
     flexDirection: 'row',
@@ -572,7 +792,6 @@ const styles = StyleSheet.create({
     marginEnd: spacing.md,
   },
   modalContent: {
-    flex: 1,
     padding: spacing.md,
   },
   modalCard: {

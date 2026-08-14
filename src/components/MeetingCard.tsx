@@ -99,14 +99,20 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
         </Text>
       </View>
 
-      {/* Time & Day Row */}
+      {/* Time & Day Row with strict LTR time range */}
       <View style={styles.infoRow}>
         <View style={styles.iconWrapper}>
           <Clock size={16} color={colors.primary} />
         </View>
-        <Text style={[styles.infoText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-          <Text style={styles.dayHighlight}>{dayName}</Text> | {startTime} - {endTime}
-        </Text>
+        <View style={styles.timeContainer}>
+          <Text style={[styles.dayHighlight, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+            {dayName}
+          </Text>
+          <Text style={styles.timeDivider}> | </Text>
+          <Text style={styles.timeLtrText}>
+            {`\u200E${startTime} \u2013 ${endTime}`}
+          </Text>
+        </View>
       </View>
 
       {/* Optional Notes */}
@@ -218,9 +224,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     flex: 1,
   },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    flex: 1,
+  },
   dayHighlight: {
     fontWeight: '700',
     color: colors.primary,
+    fontSize: 14,
+  },
+  timeDivider: {
+    color: colors.textMuted,
+    fontSize: 14,
+  },
+  timeLtrText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    writingDirection: 'ltr',
+    textAlign: 'left',
   },
   notesContainer: {
     backgroundColor: '#f8fafc',
