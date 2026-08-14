@@ -1,34 +1,58 @@
-# Gradle files
-.gradle/
-build/
+# Node & Dependencies
+node_modules/
+package-lock.json.bak
+yarn-error.log
+yarn-debug.log*
+npm-debug.log*
 
-# Local configuration file (sdk path, etc)
-local.properties
+# Expo & Metro
+.expo/
+.expo-shared/
+web-build/
+dist/
+coverage/
 
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
+# Android Native Build Outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/.cxx/
+android/local.properties
+android/app/release/
+android/captures/
 *.apk
-output-metadata.json
+*.aab
 
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
-
-# Keystore files
+# Keystores & Credentials
 *.jks
 *.keystore
-
-# Google Services (e.g. APIs or Firebase)
+*.key
+*.p12
+*.pem
 google-services.json
+GoogleService-Info.plist
 
-# Android Profiling
-*.hprof
+# Native caches & IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# macOS & System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# TypeScript / Temporary build logs
+*.tsbuildinfo
+*.log
+.npm

@@ -1,0 +1,60 @@
+{
+  "app": {
+    "title": "Narcotics Anonymous Egypt",
+    "short_title": "NA Egypt",
+    "offline_banner": "You are offline - displaying locally stored data"
+  },
+  "tabs": {
+    "meetings": "Meetings",
+    "events": "Events",
+    "agendas": "Agendas & Reports",
+    "contact": "Change Request / Contact"
+  },
+  "meetings": {
+    "search_placeholder": "Search group name, neighborhood, city...",
+    "filter_button": "Filter Meetings",
+    "all_cities": "All Cities",
+    "all_neighborhoods": "All Neighborhoods",
+    "all_days": "All Days",
+    "type_open": "Open Meeting",
+    "type_closed": "Closed Meeting",
+    "lang_ar": "Arabic",
+    "lang_en": "English",
+    "lang_both": "Arabic & English",
+    "no_results": "No meetings match your criteria",
+    "directions": "Map Directions",
+    "bookmark_added": "Meeting saved to local favorites",
+    "bookmark_removed": "Meeting removed from favorites"
+  },
+  "events": {
+    "title": "Events & Workshops",
+    "subtitle": "Conventions, service workshops, and fellowship gatherings",
+    "notify_me": "Enable Notifications",
+    "location_label": "Location:",
+    "no_events": "No upcoming events scheduled"
+  },
+  "agendas": {
+    "title": "Agendas & Committee Reports",
+    "subtitle": "Restricted to trusted servants and service committee members",
+    "azure_login": "Sign in with Azure AD",
+    "logged_in_as": "Logged in as:",
+    "logout": "Sign Out",
+    "view_pdf": "View PDF Report",
+    "close_pdf": "Close Report",
+    "login_required": "Please sign in to view service committee reports and agendas"
+  },
+  "contact": {
+    "title": "Meeting Change Request / Inquiry",
+    "subtitle": "Submit updates to meeting schedules or send general inquiries",
+    "request_type": "Request Type",
+    "type_change_request": "Meeting Schedule / Info Change",
+    "type_inquiry": "General Public Inquiry",
+    "group_name": "Group Name",
+    "details": "Details / Notes",
+    "attachment": "Attachment (Image or PDF document)",
+    "select_file": "Select File",
+    "submit": "Submit Request",
+    "offline_notice": "Saved offline in outbox queue. Will submit automatically when back online.",
+    "outbox_status_title": "Offline Outbox Status"
+  }
+}
