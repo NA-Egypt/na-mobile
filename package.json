@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "type-check": "tsc --noEmit",
+    "clean": "cd android && ./gradlew --stop && rm -rf app/build build app/.cxx .cxx .gradle && find ../node_modules -type d \\( -name '.cxx' -o -name 'build' \\) -path '*/android/*' -exec rm -rf {} + 2>/dev/null || true",
     "postinstall": "node scripts/patch-android.js"
   },
   "dependencies": {
