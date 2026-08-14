@@ -30,7 +30,15 @@
     writingDirection: isAr ? 'rtl' : 'ltr',
   }}
   ```
-- Isolate embedded English terms (*H&I, GSR, PDF, Newcomers*) inside Arabic text blocks to prevent punctuation reversals.
+- Enforce Unicode Left-to-Right (`\u200E`) isolation on time ranges and acronyms (*H&I, GSR, PDF, Newcomers*) inside Arabic text blocks to prevent inverted punctuation or swapped start/end times:
+  ```ts
+  <Text style={{ writingDirection: 'ltr' }}>{`\u200E${startTime} \u2013 ${endTime}`}</Text>
+  ```
 
-## 4. Git Large Payload Handling
-- Set `git config http.postBuffer 524288000` (500MB) when pushing initial React Native repos with embedded asset bundles to avoid `RPC failed; HTTP 400`.
+## 4. Native C++ Storage Management & Build Optimizations
+- **Target CPU Architectures**: In `android/gradle.properties`, target modern 64-bit architectures (`reactNativeArchitectures=arm64-v8a,x86_64`) to cut compilation time from 10+ minutes to ~1m 45s and avoid 4x duplicate object binaries.
+- **Node Modules & Build Output Purging**: React Native C++ libraries compile intermediate object files into `node_modules/**/android/build` and `.cxx`. Use `npm run clean` to stop Gradle daemons and purge all intermediate C++ compilation outputs across `android/`, `ios/Pods`, and `node_modules/`.
+- **C++ Header Patching**: In React Native 0.86+, `std::format("{}%", dimension.value)` in `graphicsConversions.h` must be patched to `return std::to_string(dimension.value) + "%";` across both `node_modules/` and `.gradle/caches/transforms/*/transformed/react-android-*/`.
+
+## 5. Physical iOS Device Deployment
+- When testing on connected physical iPhones via Xcode/ADB, skip the optional 8+ GB "iOS Simulator Runtime" download. Physical iPhone builds only require personal Apple ID team signing (`open ios/NAEgypt.xcworkspace` ➔ Signing & Capabilities ➔ Team).
