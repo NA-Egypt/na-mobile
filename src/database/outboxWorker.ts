@@ -68,7 +68,7 @@ export async function processOutboxQueue(): Promise<void> {
         await database.write(async () => {
           await action.update((a) => {
             a.status = 'failed';
-            a.retryCount = a.retryCount + 1;
+            a.retryCount = (a.retryCount || 0) + 1;
           });
         });
       }

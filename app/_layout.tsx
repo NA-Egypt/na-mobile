@@ -17,9 +17,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Seed initial local database tables & pull live data
-    seedInitialLocalData().then(() => {
-      pullMasterData();
-    });
+    seedInitialLocalData()
+      .then(() => {
+        pullMasterData();
+      })
+      .catch((err) => {
+        console.warn('Initial data seeding error:', err);
+      });
 
     // Start network listener for outbox queue worker
     const unsubscribeOutbox = startOutboxNetworkListener();
@@ -31,14 +35,14 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={colors.primary} />
+        <StatusBar style="light" />
         <OfflineBanner />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.primary },
             headerTintColor: '#ffffff',
             headerTitleStyle: { fontWeight: '700' },
-            contentStyle: { backgroundColor: '#f7fbff' },
+            contentStyle: { backgroundColor: colors.bgLight },
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -56,3 +60,4 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+

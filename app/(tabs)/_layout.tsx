@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapPin, Calendar, FileText, Send } from 'lucide-react-native';
-import { colors } from '../../src/theme';
+import { colors, shadows } from '../../src/theme';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -13,14 +13,19 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: '#94a3b8',
+        tabBarLabelStyle: {
+          fontWeight: '600',
+          fontSize: 11,
+        },
         tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.border,
-          height: 56 + (insets.bottom > 0 ? insets.bottom : 8),
+          backgroundColor: '#11253e', // Deep Navy website footer/nav color
+          borderTopColor: 'rgba(255, 255, 255, 0.08)',
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 8),
           paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-          paddingTop: 6,
+          paddingTop: 8,
+          ...shadows.header,
         },
       }}
     >
@@ -55,3 +60,4 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+

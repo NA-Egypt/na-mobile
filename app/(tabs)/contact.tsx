@@ -282,7 +282,7 @@ export default function ContactScreen() {
                   </View>
                 </View>
                 <Text style={[styles.outboxDate, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                  {new Date(item.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
+                  {new Date(item.createdAt || Date.now()).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
                 </Text>
               </View>
             ))}

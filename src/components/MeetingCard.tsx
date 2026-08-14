@@ -66,7 +66,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
             </Text>
           </View>
           <View style={styles.langBadge}>
-            <Globe size={13} color={colors.primary} style={{ marginEnd: 4 }} />
+            <Globe size={12} color={colors.primary} style={{ marginEnd: 4 }} />
             <Text style={styles.langBadgeText}>{getLanguageLabel()}</Text>
           </View>
         </View>
@@ -78,8 +78,8 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
         >
           <Bookmark
             size={22}
-            color={isBookmarked ? colors.accent : colors.textMuted}
-            fill={isBookmarked ? colors.accent : 'transparent'}
+            color={isBookmarked ? colors.gold : colors.textMuted}
+            fill={isBookmarked ? colors.gold : 'transparent'}
           />
         </TouchableOpacity>
       </View>
@@ -92,7 +92,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
       {/* Location Row */}
       <View style={styles.infoRow}>
         <View style={styles.iconWrapper}>
-          <MapPin size={16} color={colors.primary} />
+          <MapPin size={15} color={colors.accent} />
         </View>
         <Text style={[styles.infoText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
           {cityName}{neighborhoodName ? ` • ${neighborhoodName}` : ''}
@@ -102,7 +102,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
       {/* Time & Day Row with strict LTR time range */}
       <View style={styles.infoRow}>
         <View style={styles.iconWrapper}>
-          <Clock size={16} color={colors.primary} />
+          <Clock size={15} color={colors.accent} />
         </View>
         <View style={styles.timeContainer}>
           <Text style={[styles.dayHighlight, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
@@ -130,7 +130,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
         onPress={handleOpenMap}
         activeOpacity={0.85}
       >
-        <Navigation size={16} color={colors.white} style={{ marginEnd: spacing.xs + 2 }} />
+        <Navigation size={15} color={colors.white} style={{ marginEnd: spacing.xs + 2 }} />
         <Text style={styles.mapButtonText}>{t('meetings.directions')}</Text>
       </TouchableOpacity>
     </View>
@@ -140,11 +140,11 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: borderRadius.card,
     padding: spacing.md + 2,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
+    borderColor: 'rgba(30, 58, 95, 0.08)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -163,10 +163,10 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   openBadge: {
-    backgroundColor: '#e4f7fa',
+    backgroundColor: '#e0f8fc',
   },
   closedBadge: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fef3c7',
   },
   badgeText: {
     ...typography.caption,
@@ -174,10 +174,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   openBadgeText: {
-    color: '#0891b2',
+    color: '#08899f',
   },
   closedBadgeText: {
-    color: '#ea580c',
+    color: '#d97706',
   },
   langBadge: {
     flexDirection: 'row',
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.08)',
+    borderColor: 'rgba(30, 58, 95, 0.06)',
   },
   langBadgeText: {
     ...typography.caption,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: borderRadius.full,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'rgba(16, 179, 207, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginEnd: spacing.sm,
@@ -274,3 +274,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

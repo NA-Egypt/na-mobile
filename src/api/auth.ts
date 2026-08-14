@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string;
   email: string;
   roles: string[]; // e.g. ['group_trusted_servant', 'service_body_member', 'admin']
+  permissions?: string[];
 }
 
 export interface AzureLoginResponse {

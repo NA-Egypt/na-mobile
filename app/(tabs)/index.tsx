@@ -314,16 +314,16 @@ export default function MeetingFinderScreen() {
 const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
-    backgroundColor: '#f7fbff',
+    backgroundColor: '#11253e',
   },
   safeHeader: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#11253e',
   },
   brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.primary,
+    backgroundColor: '#11253e',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
@@ -339,24 +339,25 @@ const styles = StyleSheet.create({
   brandTitleAr: {
     ...typography.h3,
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
   },
   brandTitleEn: {
     ...typography.caption,
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
-    letterSpacing: 0.3,
+    color: 'rgba(224, 248, 252, 0.8)',
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   langToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   langToggleText: {
     color: '#ffffff',
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
-    backgroundColor: colors.primary,
+    backgroundColor: '#11253e',
     gap: spacing.sm,
   },
   searchInputContainer: {
@@ -379,6 +380,11 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.sm + 2,
     height: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchIcon: {
     marginEnd: spacing.xs,
@@ -390,7 +396,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   filterIconButton: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     width: 44,
     height: 44,
     borderRadius: borderRadius.md,
@@ -404,7 +410,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   refreshIconButton: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     width: 44,
     height: 44,
     borderRadius: borderRadius.md,
@@ -415,14 +421,17 @@ const styles = StyleSheet.create({
   },
   contentBody: {
     flex: 1,
-    backgroundColor: '#f7fbff',
+    backgroundColor: colors.bgLight,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
   },
   resultsHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.md + 2,
     paddingBottom: spacing.xs,
   },
   resultsCountText: {
@@ -432,15 +441,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   clearFiltersBtn: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: '#e4f7fa',
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    backgroundColor: colors.accentLight,
     borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 179, 207, 0.2)',
   },
   clearFiltersText: {
     ...typography.caption,
     fontWeight: '700',
-    color: '#0891b2',
+    color: colors.accentDark,
     fontSize: 11,
   },
   loadingContainer: {
