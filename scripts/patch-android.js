@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const os = require('os');
 
 // 1. Patch iOS Podspecs
 const rnsvg = 'node_modules/react-native-svg/RNSVG.podspec';
@@ -109,19 +110,27 @@ if (fs.existsSync(wdbBridge)) {
   fs.writeFileSync(wdbBridge, c);
 }
 
-// 6. Patch C++ graphicsConversions.h std::format in node_modules and gradle cache
-const headerPaths = [
-  'node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h',
-  '/Users/hani/.gradle/caches/9.4.1/transforms/4ce9507f50dcafce0ae44ddc1e4bcbbb/transformed/react-android-0.87.0-debug/prefab/modules/reactnative/include/react/renderer/core/graphicsConversions.h',
-  '/Users/hani/.gradle/caches/9.4.1/transforms/b52b1fab9b631c1aacd3e7577d3bc3b6/transformed/react-android-0.86.2-debug/prefab/modules/reactnative/include/react/renderer/core/graphicsConversions.h'
-];
+// 6. Recursively find and patch all graphicsConversions.h files
+try {
+  const gradleHome = path.join(os.homedir(), '.gradle', 'caches');
+  const findCmd = `find "${gradleHome}" -name "graphicsConversions.h" 2>/dev/null`;
+  const results = execSync(findCmd, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
 
-headerPaths.forEach(gc => {
-  if (fs.existsSync(gc)) {
-    let c = fs.readFileSync(gc, 'utf8');
-    c = c.replace('return std::format("{}%", dimension.value);', 'return std::to_string(dimension.value) + "%";');
-    fs.writeFileSync(gc, c);
-  }
-});
+  const localHeader = 'node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h';
+  if (fs.existsSync(localHeader)) results.push(localHeader);
+
+  results.forEach(filePath => {
+    if (fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, 'utf8');
+      if (content.includes('std::format("{}%", dimension.value)')) {
+        content = content.replace(/return std::format\("\{\}%", dimension\.value\);/g, 'return std::to_string(dimension.value) + "%";');
+        fs.writeFileSync(filePath, content);
+        console.log('Patched graphicsConversions.h at:', filePath);
+      }
+    }
+  });
+} catch (e) {
+  console.warn('Warning during graphicsConversions patching:', e.message);
+}
 
 console.log('✅ Android and iOS compatibility patches applied successfully.');
