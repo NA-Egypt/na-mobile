@@ -1,6 +1,7 @@
 import { database } from './index';
 import { apiClient } from '../api/client';
 import Meeting from './models/Meeting';
+import Group from './models/Group';
 import City from './models/City';
 import Neighborhood from './models/Neighborhood';
 import Day from './models/Day';
@@ -13,13 +14,25 @@ const extractArray = (res: any): any[] => {
   if (!res) return [];
   if (Array.isArray(res.data?.data)) return res.data.data;
   if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res)) return res;
   return [];
 };
 
 export async function pullMasterData(): Promise<void> {
   try {
-    const [meetingsRes, citiesRes, neighborhoodsRes, eventsRes, calendarEventsRes, topicsRes, optionsRes, daysRes] = await Promise.allSettled([
+    const [
+      meetingsRes,
+      groupsRes,
+      citiesRes,
+      neighborhoodsRes,
+      eventsRes,
+      calendarEventsRes,
+      topicsRes,
+      optionsRes,
+      daysRes,
+    ] = await Promise.allSettled([
       apiClient.get('/meetings'),
+      apiClient.get('/groups'),
       apiClient.get('/cities'),
       apiClient.get('/neighborhoods'),
       apiClient.get('/events'),
@@ -35,6 +48,7 @@ export async function pullMasterData(): Promise<void> {
         const days = extractArray(daysRes.value);
         const col = database.get<Day>('days');
         for (const item of days) {
+          if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
           if (existing.length > 0) {
             await existing[0].update((d) => {
@@ -58,6 +72,7 @@ export async function pullMasterData(): Promise<void> {
         const cities = extractArray(citiesRes.value);
         const col = database.get<City>('cities');
         for (const item of cities) {
+          if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
           if (existing.length > 0) {
             await existing[0].update((c) => {
@@ -81,10 +96,12 @@ export async function pullMasterData(): Promise<void> {
         const neighborhoods = extractArray(neighborhoodsRes.value);
         const col = database.get<Neighborhood>('neighborhoods');
         for (const item of neighborhoods) {
+          if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+          const cityId = item.city_id ? String(item.city_id) : '';
           if (existing.length > 0) {
             await existing[0].update((n) => {
-              n.cityId = String(item.city_id || n.cityId);
+              n.cityId = cityId || n.cityId;
               n.arName = item.ar_name || n.arName;
               n.enName = item.en_name || n.enName;
               n.updatedAt = new Date();
@@ -92,7 +109,7 @@ export async function pullMasterData(): Promise<void> {
           } else {
             await col.create((n) => {
               n.remoteId = String(item.id);
-              n.cityId = String(item.city_id || '');
+              n.cityId = cityId;
               n.arName = item.ar_name || '';
               n.enName = item.en_name || '';
               n.updatedAt = new Date();
@@ -101,29 +118,140 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 4. Meetings with direct live API attributes
+      // 4. Groups
+      if (groupsRes.status === 'fulfilled') {
+        const groups = extractArray(groupsRes.value);
+        const col = database.get<Group>('groups');
+        for (const item of groups) {
+          if (!item?.id) continue;
+          const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+          const name = item.ar_name || item.en_name || item.name || '';
+          const groupType = item.group_type || '';
+          const cityId = item.neighborhood?.city_id ? String(item.neighborhood.city_id) : '';
+          const neighborhoodId = item.neighborhood_id ? String(item.neighborhood_id) : '';
+
+          if (existing.length > 0) {
+            await existing[0].update((g) => {
+              g.name = name || g.name;
+              g.groupType = groupType || g.groupType;
+              g.cityId = cityId || g.cityId;
+              g.neighborhoodId = neighborhoodId || g.neighborhoodId;
+              g.updatedAt = new Date();
+            });
+          } else {
+            await col.create((g) => {
+              g.remoteId = String(item.id);
+              g.name = name;
+              g.groupType = groupType;
+              g.cityId = cityId;
+              g.neighborhoodId = neighborhoodId;
+              g.updatedAt = new Date();
+            });
+          }
+        }
+      }
+
+      // 5. Topics
+      if (topicsRes.status === 'fulfilled') {
+        const topics = extractArray(topicsRes.value);
+        const col = database.get<Topic>('topics');
+        for (const item of topics) {
+          if (!item?.id) continue;
+          const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+          if (existing.length > 0) {
+            await existing[0].update((t) => {
+              t.arName = item.ar_name || item.name_ar || t.arName;
+              t.enName = item.en_name || item.name_en || t.enName;
+            });
+          } else {
+            await col.create((t) => {
+              t.remoteId = String(item.id);
+              t.arName = item.ar_name || item.name_ar || '';
+              t.enName = item.en_name || item.name_en || '';
+            });
+          }
+        }
+      }
+
+      // 6. Options
+      if (optionsRes.status === 'fulfilled') {
+        const options = extractArray(optionsRes.value);
+        const col = database.get<Option>('options');
+        for (const item of options) {
+          if (!item?.id) continue;
+          const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+          if (existing.length > 0) {
+            await existing[0].update((o) => {
+              o.arName = item.ar_name || item.name_ar || o.arName;
+              o.enName = item.en_name || item.name_en || o.enName;
+            });
+          } else {
+            await col.create((o) => {
+              o.remoteId = String(item.id);
+              o.arName = item.ar_name || item.name_ar || '';
+              o.enName = item.en_name || item.name_en || '';
+            });
+          }
+        }
+      }
+
+      // 7. Meetings (Handles both nested group relation schema & flat fallbacks)
       if (meetingsRes.status === 'fulfilled') {
         const remoteMeetings = extractArray(meetingsRes.value);
         const col = database.get<Meeting>('meetings');
         for (const item of remoteMeetings) {
+          if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+
+          // Extract attributes considering both relation hierarchy and flat keys
+          const groupObj = item.group || {};
+          const groupNeighborhood = groupObj.neighborhood || {};
+          const groupCity = groupNeighborhood.city || {};
+
+          const groupNameAr = groupObj.ar_name || item.group_name_ar || '';
+          const groupNameEn = groupObj.en_name || item.group_name_en || '';
+          const groupType = groupObj.group_type || item.group_type || '';
+          const addressAr = groupObj.ar_address || item.address_ar || '';
+          const addressEn = groupObj.en_address || item.address_en || '';
+          const locationUrl =
+            groupObj.location ||
+            item.location ||
+            item.location_url ||
+            item.map_url ||
+            item.google_maps_url ||
+            '';
+
+          const cityNameAr = groupCity.ar_name || item.city_name_ar || '';
+          const cityNameEn = groupCity.en_name || item.city_name_en || '';
+          const neighborhoodNameAr = groupNeighborhood.ar_name || item.neighborhood_name_ar || '';
+          const neighborhoodNameEn = groupNeighborhood.en_name || item.neighborhood_name_en || '';
+
+          // Format topic
+          let topicName = '';
+          if (Array.isArray(item.topics) && item.topics.length > 0) {
+            topicName = item.topics.map((t: any) => t.ar_name || t.en_name || t.name || '').filter(Boolean).join(', ');
+          } else if (typeof item.topic === 'object' && item.topic !== null) {
+            topicName = item.topic.ar_name || item.topic.en_name || item.topic.name || '';
+          } else if (item.topic || item.topic_name || item.topic_ar || item.topic_en) {
+            topicName = String(item.topic || item.topic_name || item.topic_ar || item.topic_en);
+          }
+
           if (existing.length > 0) {
             await existing[0].update((m) => {
               m.groupId = item.group_id ? String(item.group_id) : m.groupId;
               m.directOnlineGroupId = item.direct_online_group_id ? String(item.direct_online_group_id) : m.directOnlineGroupId;
               m.dayId = item.day_id ? String(item.day_id) : m.dayId;
-              m.groupNameAr = item.group_name_ar ?? m.groupNameAr;
-              m.groupNameEn = item.group_name_en ?? m.groupNameEn;
-              m.groupType = item.group_type ?? m.groupType;
-              const topicVal = typeof item.topic === 'object' ? (item.topic?.ar_name || item.topic?.en_name || item.topic?.name) : (item.topic || item.topic_name || item.topic_ar || item.topic_en);
-              m.addressAr = item.address_ar ?? m.addressAr;
-              m.addressEn = item.address_en ?? m.addressEn;
-              m.locationUrl = item.location || item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || m.locationUrl;
-              m.topicName = topicVal ? String(topicVal) : m.topicName;
-              m.cityNameAr = item.city_name_ar ?? m.cityNameAr;
-              m.cityNameEn = item.city_name_en ?? m.cityNameEn;
-              m.neighborhoodNameAr = item.neighborhood_name_ar ?? m.neighborhoodNameAr;
-              m.neighborhoodNameEn = item.neighborhood_name_en ?? m.neighborhoodNameEn;
+              m.groupNameAr = groupNameAr || m.groupNameAr;
+              m.groupNameEn = groupNameEn || m.groupNameEn;
+              m.groupType = groupType || m.groupType;
+              m.addressAr = addressAr || m.addressAr;
+              m.addressEn = addressEn || m.addressEn;
+              m.locationUrl = locationUrl || m.locationUrl;
+              m.topicName = topicName || m.topicName;
+              m.cityNameAr = cityNameAr || m.cityNameAr;
+              m.cityNameEn = cityNameEn || m.cityNameEn;
+              m.neighborhoodNameAr = neighborhoodNameAr || m.neighborhoodNameAr;
+              m.neighborhoodNameEn = neighborhoodNameEn || m.neighborhoodNameEn;
               m.startTime = item.start_time ?? m.startTime;
               m.endTime = item.end_time ?? m.endTime;
               m.formattedStartTime = item.formatted_start_time ?? m.formattedStartTime;
@@ -137,23 +265,22 @@ export async function pullMasterData(): Promise<void> {
               m.updatedAt = new Date();
             });
           } else {
-            const topicVal = typeof item.topic === 'object' ? (item.topic?.ar_name || item.topic?.en_name || item.topic?.name) : (item.topic || item.topic_name || item.topic_ar || item.topic_en);
             await col.create((m) => {
               m.remoteId = String(item.id);
               m.groupId = item.group_id ? String(item.group_id) : '';
               m.directOnlineGroupId = item.direct_online_group_id ? String(item.direct_online_group_id) : undefined;
               m.dayId = item.day_id ? String(item.day_id) : '';
-              m.groupNameAr = item.group_name_ar || '';
-              m.groupNameEn = item.group_name_en || '';
-              m.groupType = item.group_type || '';
-              m.addressAr = item.address_ar || '';
-              m.addressEn = item.address_en || '';
-              m.locationUrl = item.location || item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || '';
-              m.topicName = topicVal ? String(topicVal) : '';
-              m.cityNameAr = item.city_name_ar || '';
-              m.cityNameEn = item.city_name_en || '';
-              m.neighborhoodNameAr = item.neighborhood_name_ar || '';
-              m.neighborhoodNameEn = item.neighborhood_name_en || '';
+              m.groupNameAr = groupNameAr;
+              m.groupNameEn = groupNameEn;
+              m.groupType = groupType;
+              m.addressAr = addressAr;
+              m.addressEn = addressEn;
+              m.locationUrl = locationUrl;
+              m.topicName = topicName;
+              m.cityNameAr = cityNameAr;
+              m.cityNameEn = cityNameEn;
+              m.neighborhoodNameAr = neighborhoodNameAr;
+              m.neighborhoodNameEn = neighborhoodNameEn;
               m.startTime = item.start_time || '';
               m.endTime = item.end_time || '';
               m.formattedStartTime = item.formatted_start_time || '';
@@ -170,7 +297,7 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 5. Events: Combine /calendar-events and /events from live backend
+      // 8. Events (Both /calendar-events and /events)
       const rawEvents: any[] = [];
       if (calendarEventsRes.status === 'fulfilled') {
         const calEvents = extractArray(calendarEventsRes.value);
@@ -183,11 +310,14 @@ export async function pullMasterData(): Promise<void> {
 
       const eventsCol = database.get<Event>('events');
       for (const item of rawEvents) {
+        if (!item?.id) continue;
         const existing = await eventsCol.query(Q.where('remote_id', String(item.id))).fetch();
         const start = item.start || item.start_date || '';
         const end = item.end || item.end_date || '';
         const organizer = item.organizer || '';
-        const recurrence = item.formatted_recurrence || (Array.isArray(item.recurrence) ? item.recurrence.join(', ') : '');
+        const recurrence =
+          item.formatted_recurrence ||
+          (Array.isArray(item.recurrence) ? item.recurrence.join(', ') : item.recurrence || '');
 
         if (existing.length > 0) {
           await existing[0].update((ev) => {
@@ -212,38 +342,6 @@ export async function pullMasterData(): Promise<void> {
             ev.recurrence = recurrence;
             ev.updatedAt = new Date();
           });
-        }
-      }
-
-      // 6. Topics
-      if (topicsRes.status === 'fulfilled') {
-        const topics = extractArray(topicsRes.value);
-        const col = database.get<Topic>('topics');
-        for (const item of topics) {
-          const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
-          if (existing.length === 0) {
-            await col.create((t) => {
-              t.remoteId = String(item.id);
-              t.arName = item.ar_name || item.name_ar || '';
-              t.enName = item.en_name || item.name_en || '';
-            });
-          }
-        }
-      }
-
-      // 7. Options
-      if (optionsRes.status === 'fulfilled') {
-        const options = extractArray(optionsRes.value);
-        const col = database.get<Option>('options');
-        for (const item of options) {
-          const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
-          if (existing.length === 0) {
-            await col.create((o) => {
-              o.remoteId = String(item.id);
-              o.arName = item.ar_name || item.name_ar || '';
-              o.enName = item.en_name || item.name_en || '';
-            });
-          }
         }
       }
     });
