@@ -8,7 +8,7 @@
     "meetings": "Meetings",
     "events": "Events",
     "agendas": "Agendas & Reports",
-    "contact": "Change Request / Contact"
+    "contact": "Contact Us"
   },
   "meetings": {
     "search_placeholder": "Search group name, neighborhood, city...",
@@ -41,10 +41,11 @@
     "logout": "Sign Out",
     "view_pdf": "View PDF Report",
     "close_pdf": "Close Report",
-    "login_required": "Please sign in to view service committee reports and agendas"
+    "login_required": "Please sign in to view service committee reports and agendas",
+    "login_prompt": "Sign In"
   },
   "contact": {
-    "title": "Meeting Change Request / Inquiry",
+    "title": "Contact Us",
     "subtitle": "Submit updates to meeting schedules or send general inquiries",
     "request_type": "Request Type",
     "type_change_request": "Meeting Schedule / Info Change",

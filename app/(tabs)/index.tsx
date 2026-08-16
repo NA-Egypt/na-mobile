@@ -25,6 +25,7 @@ import {
   MeetingCardSkeleton,
   LanguageSwitcher,
 } from '../../src/components/ui';
+import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { pullMasterData } from '../../src/database/sync';
 import { useAppTheme } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
@@ -119,6 +120,7 @@ export default function MeetingFinderScreen() {
           endTime: m.formattedEndTime || m.endTime || '',
           address: isAr ? m.addressAr || m.addressEn || '' : m.addressEn || m.addressAr || '',
           locationUrl: m.locationUrl || '',
+          topicName: m.topicName || '',
           type: m.type || 'open',
           lang: m.lang || 'arabic',
           notes: m.notes || '',
@@ -294,6 +296,7 @@ export default function MeetingFinderScreen() {
         lang={item.lang}
         notes={item.notes}
         locationUrl={item.locationUrl}
+        topicName={item.topicName}
         isBookmarked={!!bookmarks[item.id]}
         onToggleBookmark={toggleBookmark}
         index={index}
@@ -319,7 +322,10 @@ export default function MeetingFinderScreen() {
             </View>
           </View>
 
-          <LanguageSwitcher />
+          <View style={styles.headerRightActions}>
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </View>
         </View>
 
         {/* Search Bar & Filter Trigger */}
@@ -405,8 +411,8 @@ export default function MeetingFinderScreen() {
                       ? 'لا توجد اجتماعات تطابق الفلاتر المحددة. جرب إزالة بعض الفلاتر أو تغيير كلمة البحث.'
                       : 'No meetings match your selected filters. Try removing some filters or changing search keywords.'
                     : isAr
-                    ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
-                    : 'No meetings found matching your search.'
+                      ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
+                      : 'No meetings found matching your search.'
                 }
                 primaryActionTitle={activeFilterItems.length > 0 ? (isAr ? 'إلغاء الفلاتر' : 'Clear Filters') : undefined}
                 onPrimaryAction={activeFilterItems.length > 0 ? handleClearAllFilters : undefined}
@@ -442,9 +448,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   brandLeft: {
     flexDirection: 'row',

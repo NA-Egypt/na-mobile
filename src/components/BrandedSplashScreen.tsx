@@ -5,13 +5,15 @@ import { colors } from '../theme';
 
 interface BrandedSplashScreenProps {
   onFinish?: () => void;
+  isReady?: boolean;
 }
 
-export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFinish }) => {
+export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFinish, isReady = true }) => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const badgeAnim = useRef(new Animated.Value(20)).current;
+  const isAnimationStarted = useRef(false);
 
   useEffect(() => {
     // Entrance animation sequence
@@ -34,21 +36,25 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
         useNativeDriver: true,
       }),
     ]).start();
+  }, []);
 
-    // Delay then smooth fade out
+  useEffect(() => {
+    if (!isReady || isAnimationStarted.current) return;
+
     const timer = setTimeout(() => {
+      isAnimationStarted.current = true;
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 450,
+        duration: 500,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         if (onFinish) onFinish();
       });
-    }, 1600);
+    }, 1400);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isReady]);
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
@@ -96,11 +102,17 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#11253e', // Deep Navy Dark matching website
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 99999,
+    zIndex: 999999,
   },
   glowCircle: {
     position: 'absolute',

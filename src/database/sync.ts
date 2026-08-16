@@ -115,9 +115,11 @@ export async function pullMasterData(): Promise<void> {
               m.groupNameAr = item.group_name_ar ?? m.groupNameAr;
               m.groupNameEn = item.group_name_en ?? m.groupNameEn;
               m.groupType = item.group_type ?? m.groupType;
+              const topicVal = typeof item.topic === 'object' ? (item.topic?.ar_name || item.topic?.en_name || item.topic?.name) : (item.topic || item.topic_name || item.topic_ar || item.topic_en);
               m.addressAr = item.address_ar ?? m.addressAr;
               m.addressEn = item.address_en ?? m.addressEn;
-              m.locationUrl = item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || m.locationUrl;
+              m.locationUrl = item.location || item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || m.locationUrl;
+              m.topicName = topicVal ? String(topicVal) : m.topicName;
               m.cityNameAr = item.city_name_ar ?? m.cityNameAr;
               m.cityNameEn = item.city_name_en ?? m.cityNameEn;
               m.neighborhoodNameAr = item.neighborhood_name_ar ?? m.neighborhoodNameAr;
@@ -135,6 +137,7 @@ export async function pullMasterData(): Promise<void> {
               m.updatedAt = new Date();
             });
           } else {
+            const topicVal = typeof item.topic === 'object' ? (item.topic?.ar_name || item.topic?.en_name || item.topic?.name) : (item.topic || item.topic_name || item.topic_ar || item.topic_en);
             await col.create((m) => {
               m.remoteId = String(item.id);
               m.groupId = item.group_id ? String(item.group_id) : '';
@@ -145,7 +148,8 @@ export async function pullMasterData(): Promise<void> {
               m.groupType = item.group_type || '';
               m.addressAr = item.address_ar || '';
               m.addressEn = item.address_en || '';
-              m.locationUrl = item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || '';
+              m.locationUrl = item.location || item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || '';
+              m.topicName = topicVal ? String(topicVal) : '';
               m.cityNameAr = item.city_name_ar || '';
               m.cityNameEn = item.city_name_en || '';
               m.neighborhoodNameAr = item.neighborhood_name_ar || '';

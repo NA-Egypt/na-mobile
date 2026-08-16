@@ -14,16 +14,19 @@ const queryClient = new QueryClient();
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
     // Seed initial local database tables & pull live data
     seedInitialLocalData()
-      .then(() => {
-        pullMasterData();
+      .then(async () => {
+        await pullMasterData().catch(() => {});
+        setIsDataLoaded(true);
       })
       .catch((err) => {
         console.warn('Initial data seeding error:', err);
+        setIsDataLoaded(true);
       });
 
     // Start network listener for outbox queue worker
@@ -56,7 +59,12 @@ export default function RootLayout() {
             }}
           />
         </Stack>
-        {showSplash && <BrandedSplashScreen onFinish={() => setShowSplash(false)} />}
+        {showSplash && (
+          <BrandedSplashScreen
+            isReady={isDataLoaded}
+            onFinish={() => setShowSplash(false)}
+          />
+        )}
       </SafeAreaProvider>
     </QueryClientProvider>
   );

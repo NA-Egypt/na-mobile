@@ -30,6 +30,7 @@ import EventModel from '../../src/database/models/Event';
 import { pullMasterData } from '../../src/database/sync';
 import { useAppTheme } from '../../src/theme';
 import { AppText, Badge, AppButton, EmptyState, LanguageSwitcher } from '../../src/components/ui';
+import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { haptic } from '../../src/utils/haptics';
 
 export default function EventsScreen() {
@@ -191,7 +192,10 @@ export default function EventsScreen() {
                 : 'Conventions, Learning Days, and Regional Committee Meetings'}
             </AppText>
           </View>
-          <LanguageSwitcher />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </View>
         </View>
 
         {/* View Mode Segmented Switch (Calendar / List) */}

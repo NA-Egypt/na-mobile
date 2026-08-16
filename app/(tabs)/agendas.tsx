@@ -40,6 +40,7 @@ import {
   Skeleton,
   LanguageSwitcher,
 } from '../../src/components/ui';
+import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { haptic } from '../../src/utils/haptics';
 
 type AgendaTabType = 'groups' | 'service_bodies' | 'committees_archive';
@@ -116,8 +117,8 @@ export default function AgendasScreen() {
     activeTab === 'groups'
       ? groupAgendas
       : activeTab === 'service_bodies'
-      ? serviceBodyAgendas
-      : committeeReports;
+        ? serviceBodyAgendas
+        : committeeReports;
 
   return (
     <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
@@ -137,7 +138,10 @@ export default function AgendasScreen() {
                 : 'Group Agendas, Service Bodies & Committee Archive'}
             </AppText>
           </View>
-          <LanguageSwitcher />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </View>
         </View>
 
         {/* 3-Tab Segmented Selector */}
@@ -528,8 +532,8 @@ export default function AgendasScreen() {
                       ? 'لا توجد سجلات مسجلة في هذا القسم'
                       : 'No records found in this section'
                     : isAr
-                    ? 'تسجيل الدخول مطلوب'
-                    : 'Sign in Required'
+                      ? 'تسجيل الدخول مطلوب'
+                      : 'Sign in Required'
                 }
                 description={
                   user
@@ -537,8 +541,8 @@ export default function AgendasScreen() {
                       ? 'يتم مزامنة تقارير وأرشيف اللجان وجداول الأعمال مباشرة من قاعدة بيانات egyptna.org.'
                       : 'Agendas and Committee records synchronize directly from egyptna.org.'
                     : isAr
-                    ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف اللجان والتقارير المعتمدة.'
-                    : 'Sign in with your Microsoft account to access approved committee archives.'
+                      ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف اللجان والتقارير المعتمدة.'
+                      : 'Sign in with your Microsoft account to access approved committee archives.'
                 }
                 primaryActionTitle={!user ? t('agendas.login_prompt') : undefined}
                 onPrimaryAction={!user ? () => router.push('/login') : undefined}

@@ -26,6 +26,7 @@ import { database } from '../../src/database';
 import OutboxAction from '../../src/database/models/OutboxAction';
 import { useAppTheme } from '../../src/theme';
 import { AppText, Badge, AppButton, LanguageSwitcher } from '../../src/components/ui';
+import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { haptic } from '../../src/utils/haptics';
 
 export default function ContactScreen() {
@@ -150,7 +151,7 @@ export default function ContactScreen() {
           </View>
           <View style={styles.headerTextCol}>
             <AppText variant="h3" color="#ffffff" weight="800">
-              {isAr ? 'اتصل بنا • الاستفسارات العامة' : 'Contact Us • General Inquiries'}
+              {isAr ? 'اتصل بنا' : 'Contact Us'}
             </AppText>
             <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
               {isAr
@@ -158,7 +159,10 @@ export default function ContactScreen() {
                 : 'Get in touch with NA Egypt PR & Service Committee'}
             </AppText>
           </View>
-          <LanguageSwitcher />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </View>
         </View>
       </SafeAreaView>
 

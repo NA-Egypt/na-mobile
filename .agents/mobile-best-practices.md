@@ -42,3 +42,42 @@
 
 ## 5. Physical iOS Device Deployment
 - When testing on connected physical iPhones via Xcode/ADB, skip the optional 8+ GB "iOS Simulator Runtime" download. Physical iPhone builds only require personal Apple ID team signing (`open ios/NAEgypt.xcworkspace` ➔ Signing & Capabilities ➔ Team).
+
+## 6. Splash Screen Sizing & Load Synchronization
+- **Fullscreen Container Bounds**: Custom React Native splash screens must use explicit full-screen absolute bounds rather than `StyleSheet.absoluteFill` alone to prevent viewport cutoff on various device aspect ratios:
+  ```ts
+  container: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 999999,
+  }
+  ```
+- **Data-Ready Synchronization**: Always gate splash screen dismissal on an `isReady` state (verifying initial database seeding and initial API pull) rather than a fixed arbitrary timer, preventing flash-of-empty-content.
+
+## 7. RTL Flexbox Row & Chip Alignment
+- React Native flexbox containers do not automatically mirror child order for `flexDirection: 'row'`. Always explicitly apply:
+  ```ts
+  style={{
+    flexDirection: isAr ? 'row-reverse' : 'row',
+  }}
+  ```
+  to all filter chip groups, modal tag lists, and horizontal button clusters.
+
+## 8. Dynamic Theme Architecture & Light Mode Invariants
+- Avoid hardcoding fixed dark hex colors (e.g. `#11253e`) on screen wrappers, cards, or tab navigation.
+- Always consume semantic palette tokens via `useAppTheme()` (`colors.bgPrimary`, `colors.cardBg`, `colors.textPrimary`, `colors.borderSolid`) and expose a header `ThemeToggle` component to ensure clean Light and Dark mode rendering.
+
+## 9. Live API & WatermelonDB Sync Fallbacks
+- To support live backend models without mock data, use defensive fallback chains in `sync.ts` for URL and nested object fields:
+  ```ts
+  m.locationUrl = item.location || item.location_url || item.map_url || item.google_maps_url || '';
+  m.topicName = typeof item.topic === 'object' 
+    ? (item.topic?.ar_name || item.topic?.en_name || item.topic?.name) 
+    : (item.topic || item.topic_name || '');
+  ```
+

@@ -8,7 +8,7 @@ import {
   Share,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Clock, Bookmark, Navigation, Globe, Share2 } from 'lucide-react-native';
+import { MapPin, Clock, Bookmark, Navigation, Globe, Share2, Tag } from 'lucide-react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useAppTheme } from '../theme';
 import { AppText, Badge } from './ui';
@@ -26,6 +26,7 @@ export interface MeetingCardProps {
   lang: 'ar' | 'en' | 'both' | 'arabic' | 'english' | string;
   notes?: string;
   locationUrl?: string;
+  topicName?: string;
   isBookmarked: boolean;
   onToggleBookmark: (id: string) => void;
   index?: number;
@@ -43,6 +44,7 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   lang,
   notes,
   locationUrl,
+  topicName,
   isBookmarked,
   onToggleBookmark,
   index = 0,
@@ -208,6 +210,23 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
           </AppText>
         </View>
       </View>
+
+      {/* Topic Row */}
+      {topicName ? (
+        <View style={styles.infoRow}>
+          <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+            <Tag size={13} color={colors.accentDark} />
+          </View>
+          <AppText
+            variant="body"
+            color={colors.textSecondary}
+            weight="600"
+            style={styles.infoText}
+          >
+            {topicName}
+          </AppText>
+        </View>
+      ) : null}
 
       {/* Optional Notes */}
       {notes ? (
