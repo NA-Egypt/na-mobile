@@ -2,15 +2,17 @@ import React from 'react';
 import {
   Modal,
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { X, Check, RotateCcw } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography } from '../theme';
+import { X, RotateCcw, Check } from 'lucide-react-native';
+import { useAppTheme } from '../theme';
+import { AppText, AppButton, Badge } from './ui';
+import { haptic } from '../utils/haptics';
 
 export interface FilterOptions {
   cityId: string | null;
@@ -37,15 +39,28 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   cities,
   days,
 }) => {
+  const { colors, borderRadius, shadows } = useAppTheme();
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
+  const insets = useSafeAreaInsets();
   const [localFilters, setLocalFilters] = React.useState<FilterOptions>(filters);
 
   React.useEffect(() => {
     setLocalFilters(filters);
   }, [filters, visible]);
 
+  const countActiveFilters = (): number => {
+    let count = 0;
+    if (localFilters.cityId) count++;
+    if (localFilters.dayId) count++;
+    if (localFilters.groupType) count++;
+    if (localFilters.lang) count++;
+    if (localFilters.type) count++;
+    return count;
+  };
+
   const handleReset = () => {
+    haptic.light();
     const reset: FilterOptions = {
       cityId: null,
       dayId: null,
@@ -54,260 +69,424 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       type: null,
     };
     setLocalFilters(reset);
-    onApplyFilters(reset);
+  };
+
+  const handleApply = () => {
+    haptic.success();
+    onApplyFilters(localFilters);
     onClose();
   };
 
+  const activeCount = countActiveFilters();
+
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{t('meetings.filter_button')}</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={10} style={styles.closeBtn}>
-            <X size={22} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop */}
+        <Pressable
+          style={[styles.backdrop, { backgroundColor: colors.overlay }]}
+          onPress={onClose}
+        />
 
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
-          {/* 1. Day of Week */}
-          <Text style={styles.sectionTitle}>{isAr ? 'يوم الاجتماع' : 'Day of Week'}</Text>
-          <View style={styles.chipRow}>
-            <TouchableOpacity
-              style={[styles.chip, localFilters.dayId === null && styles.activeChip]}
-              onPress={() => setLocalFilters({ ...localFilters, dayId: null })}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.chipText, localFilters.dayId === null && styles.activeChipText]}>
-                {isAr ? 'كل الأيام' : 'All Days'}
-              </Text>
-            </TouchableOpacity>
-            {days.map((d) => (
-              <TouchableOpacity
-                key={d.id}
-                style={[styles.chip, String(localFilters.dayId) === String(d.id) && styles.activeChip]}
-                onPress={() => setLocalFilters({ ...localFilters, dayId: String(d.id) })}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.chipText, String(localFilters.dayId) === String(d.id) && styles.activeChipText]}>
-                  {d.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* Sheet Content */}
+        <View
+          style={[
+            styles.sheetContainer,
+            shadows.bottomSheet,
+            {
+              backgroundColor: colors.cardBg,
+              borderTopLeftRadius: borderRadius.xl,
+              borderTopRightRadius: borderRadius.xl,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          {/* Grab Handle */}
+          <View style={styles.handleContainer}>
+            <View style={[styles.handle, { backgroundColor: colors.borderSolid }]} />
           </View>
 
-          {/* 2. City */}
-          <Text style={styles.sectionTitle}>{isAr ? 'المدينة / المحافظة' : 'City / Governorate'}</Text>
-          <View style={styles.chipRow}>
-            <TouchableOpacity
-              style={[styles.chip, localFilters.cityId === null && styles.activeChip]}
-              onPress={() => setLocalFilters({ ...localFilters, cityId: null })}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.chipText, localFilters.cityId === null && styles.activeChipText]}>
-                {isAr ? 'كل المدن' : 'All Cities'}
-              </Text>
-            </TouchableOpacity>
-            {cities.map((c) => (
+          {/* Header */}
+          <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
+            <View style={styles.titleRow}>
+              <AppText variant="h2" color={colors.textPrimary} weight="700">
+                {t('meetings.filter_button')}
+              </AppText>
+              {activeCount > 0 && (
+                <Badge
+                  label={`${activeCount} نشط`}
+                  variant="accent"
+                  size="sm"
+                  style={{ marginStart: 8 }}
+                />
+              )}
+            </View>
+
+            <View style={styles.headerActions}>
+              {activeCount > 0 && (
+                <TouchableOpacity
+                  onPress={handleReset}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.resetBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset all filters"
+                >
+                  <RotateCcw size={14} color={colors.danger} />
+                  <AppText variant="labelSmall" color={colors.danger} weight="600" style={{ marginStart: 4 }}>
+                    {isAr ? 'إعادة ضبط' : 'Reset'}
+                  </AppText>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                key={c.id}
-                style={[styles.chip, localFilters.cityId === c.id && styles.activeChip]}
-                onPress={() => setLocalFilters({ ...localFilters, cityId: c.id })}
-                activeOpacity={0.8}
+                onPress={onClose}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={[styles.closeBtn, { backgroundColor: colors.bgSecondary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Close filter modal"
               >
-                <Text style={[styles.chipText, localFilters.cityId === c.id && styles.activeChipText]}>
-                  {c.name}
-                </Text>
+                <X size={18} color={colors.textSecondary} />
               </TouchableOpacity>
-            ))}
+            </View>
           </View>
 
-          {/* 3. Group Type (In-Person / Online) */}
-          <Text style={styles.sectionTitle}>{isAr ? 'طبيعة الاجتماع (حضوري / أونلاين)' : 'Meeting Format'}</Text>
-          <View style={styles.chipRow}>
-            {[
-              { id: null, label: isAr ? 'الكل' : 'All' },
-              { id: 'in_person', label: isAr ? 'حضوري' : 'In-person' },
-              { id: 'online', label: isAr ? 'أونلاين (عبر الإنترنت)' : 'Online' },
-              { id: 'hybrid', label: isAr ? 'هجين (مزدوج)' : 'Hybrid' },
-            ].map((gt) => (
-              <TouchableOpacity
-                key={gt.label}
-                style={[styles.chip, localFilters.groupType === gt.id && styles.activeChip]}
-                onPress={() => setLocalFilters({ ...localFilters, groupType: gt.id })}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.chipText, localFilters.groupType === gt.id && styles.activeChipText]}>
-                  {gt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* 4. Language */}
-          <Text style={styles.sectionTitle}>{isAr ? 'لغة الاجتماع' : 'Language'}</Text>
-          <View style={styles.chipRow}>
-            {[
-              { id: null, label: isAr ? 'الكل' : 'All' },
-              { id: 'arabic', label: isAr ? 'عربي' : 'Arabic' },
-              { id: 'english', label: isAr ? 'إنجليزي' : 'English' },
-              { id: 'both', label: isAr ? 'عربي / إنجليزي (مزدوج)' : 'Bilingual' },
-            ].map((l) => (
-              <TouchableOpacity
-                key={l.label}
-                style={[styles.chip, localFilters.lang === l.id && styles.activeChip]}
-                onPress={() => setLocalFilters({ ...localFilters, lang: l.id })}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.chipText, localFilters.lang === l.id && styles.activeChipText]}>
-                  {l.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* 5. Meeting Type (Open / Closed) */}
-          <Text style={styles.sectionTitle}>{isAr ? 'نوع الحضور (مفتوح / مغلق)' : 'Attendance Type'}</Text>
-          <View style={styles.chipRow}>
-            {[
-              { id: null, label: isAr ? 'الكل' : 'All' },
-              { id: 'open', label: isAr ? 'مفتوح (للجميع)' : 'Open (All Welcome)' },
-              { id: 'closed', label: isAr ? 'مغلق (للمدمنين فقط)' : 'Closed (Addicts Only)' },
-            ].map((tp) => (
-              <TouchableOpacity
-                key={tp.label}
-                style={[styles.chip, localFilters.type === tp.id && styles.activeChip]}
-                onPress={() => setLocalFilters({ ...localFilters, type: tp.id })}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.chipText, localFilters.type === tp.id && styles.activeChipText]}>
-                  {tp.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* Action Buttons */}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.resetButton} onPress={handleReset} activeOpacity={0.8}>
-            <RotateCcw size={16} color={colors.textSecondary} style={{ marginEnd: 4 }} />
-            <Text style={styles.resetText}>{isAr ? 'إعادة ضبط' : 'Reset'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.applyButton}
-            onPress={() => {
-              onApplyFilters(localFilters);
-              onClose();
-            }}
-            activeOpacity={0.85}
+          {/* Scrollable Filters */}
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Check size={18} color="#ffffff" style={{ marginEnd: 4 }} />
-            <Text style={styles.applyText}>{isAr ? 'تطبيق التصفية' : 'Apply Filters'}</Text>
-          </TouchableOpacity>
+            {/* 1. Day of Week */}
+            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+              {isAr ? 'يوم الاجتماع' : 'Day of Week'}
+            </AppText>
+            <View style={styles.chipRow}>
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: localFilters.dayId === null ? colors.accent : colors.bgSecondary,
+                    borderColor: localFilters.dayId === null ? colors.accent : colors.borderSolid,
+                    borderRadius: borderRadius.pill,
+                  },
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setLocalFilters({ ...localFilters, dayId: null });
+                }}
+              >
+                <AppText
+                  variant="label"
+                  color={localFilters.dayId === null ? colors.primaryDark : colors.textSecondary}
+                  weight={localFilters.dayId === null ? '700' : '500'}
+                >
+                  {isAr ? 'كل الأيام' : 'All Days'}
+                </AppText>
+              </TouchableOpacity>
+              {days.map((d) => {
+                const isSelected = String(localFilters.dayId) === String(d.id);
+                return (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        borderRadius: borderRadius.pill,
+                      },
+                    ]}
+                    onPress={() => {
+                      haptic.selection();
+                      setLocalFilters({ ...localFilters, dayId: String(d.id) });
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      color={isSelected ? colors.primaryDark : colors.textSecondary}
+                      weight={isSelected ? '700' : '500'}
+                    >
+                      {d.name}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 2. City */}
+            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+              {isAr ? 'المدينة / المحافظة' : 'City / Governorate'}
+            </AppText>
+            <View style={styles.chipRow}>
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: localFilters.cityId === null ? colors.accent : colors.bgSecondary,
+                    borderColor: localFilters.cityId === null ? colors.accent : colors.borderSolid,
+                    borderRadius: borderRadius.pill,
+                  },
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setLocalFilters({ ...localFilters, cityId: null });
+                }}
+              >
+                <AppText
+                  variant="label"
+                  color={localFilters.cityId === null ? colors.primaryDark : colors.textSecondary}
+                  weight={localFilters.cityId === null ? '700' : '500'}
+                >
+                  {isAr ? 'كل المدن' : 'All Cities'}
+                </AppText>
+              </TouchableOpacity>
+              {cities.map((c) => {
+                const isSelected = String(localFilters.cityId) === String(c.id);
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        borderRadius: borderRadius.pill,
+                      },
+                    ]}
+                    onPress={() => {
+                      haptic.selection();
+                      setLocalFilters({ ...localFilters, cityId: String(c.id) });
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      color={isSelected ? colors.primaryDark : colors.textSecondary}
+                      weight={isSelected ? '700' : '500'}
+                    >
+                      {c.name}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 3. Meeting Type */}
+            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+              {isAr ? 'نوع الحضور' : 'Attendance Type'}
+            </AppText>
+            <View style={styles.chipRow}>
+              {[
+                { id: null, label: isAr ? 'الكل' : 'All' },
+                { id: 'in_person', label: isAr ? 'حضوري' : 'In-Person' },
+                { id: 'online', label: isAr ? 'أونلاين' : 'Online' },
+                { id: 'hybrid', label: isAr ? 'مختلط' : 'Hybrid' },
+              ].map((opt) => {
+                const isSelected = localFilters.groupType === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={String(opt.id)}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        borderRadius: borderRadius.pill,
+                      },
+                    ]}
+                    onPress={() => {
+                      haptic.selection();
+                      setLocalFilters({ ...localFilters, groupType: opt.id });
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      color={isSelected ? colors.primaryDark : colors.textSecondary}
+                      weight={isSelected ? '700' : '500'}
+                    >
+                      {opt.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 4. Language */}
+            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+              {isAr ? 'لغة الاجتماع' : 'Meeting Language'}
+            </AppText>
+            <View style={styles.chipRow}>
+              {[
+                { id: null, label: isAr ? 'كل اللغات' : 'All Languages' },
+                { id: 'arabic', label: isAr ? 'عربي' : 'Arabic' },
+                { id: 'english', label: isAr ? 'إنجليزي' : 'English' },
+                { id: 'both', label: isAr ? 'عربي / إنجليزي' : 'Bilingual' },
+              ].map((opt) => {
+                const isSelected = localFilters.lang === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={String(opt.id)}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        borderRadius: borderRadius.pill,
+                      },
+                    ]}
+                    onPress={() => {
+                      haptic.selection();
+                      setLocalFilters({ ...localFilters, lang: opt.id });
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      color={isSelected ? colors.primaryDark : colors.textSecondary}
+                      weight={isSelected ? '700' : '500'}
+                    >
+                      {opt.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 5. Access Type (Open/Closed) */}
+            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+              {isAr ? 'طبيعة الحضور' : 'Access Policy'}
+            </AppText>
+            <View style={styles.chipRow}>
+              {[
+                { id: null, label: isAr ? 'الكل' : 'All' },
+                { id: 'open', label: isAr ? 'مفتوح (للجميع)' : 'Open (All)' },
+                { id: 'closed', label: isAr ? 'مغلق (للمدمنين فقط)' : 'Closed (Addicts Only)' },
+              ].map((opt) => {
+                const isSelected = localFilters.type === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={String(opt.id)}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        borderRadius: borderRadius.pill,
+                      },
+                    ]}
+                    onPress={() => {
+                      haptic.selection();
+                      setLocalFilters({ ...localFilters, type: opt.id });
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      color={isSelected ? colors.primaryDark : colors.textSecondary}
+                      weight={isSelected ? '700' : '500'}
+                    >
+                      {opt.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* Footer CTA */}
+          <View style={[styles.footer, { borderTopColor: colors.cardBorder }]}>
+            <AppButton
+              title={isAr ? `تطبيق الفلاتر ${activeCount > 0 ? `(${activeCount})` : ''}` : `Apply Filters ${activeCount > 0 ? `(${activeCount})` : ''}`}
+              onPress={handleApply}
+              variant="primary"
+              size="lg"
+              fullWidth
+            />
+          </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     flex: 1,
-    backgroundColor: '#f7fbff',
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...(StyleSheet.absoluteFill as object),
+  },
+  sheetContainer: {
+    maxHeight: '85%',
+    minHeight: '55%',
+    width: '100%',
+  },
+  handleContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
-    backgroundColor: '#ffffff',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   closeBtn: {
-    padding: 4,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.primary,
-    fontSize: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
-    padding: spacing.md,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.primary,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    fontSize: 15,
+    marginBottom: 10,
+    marginTop: 14,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs + 2,
+    gap: 8,
   },
   chip: {
-    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.12)',
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 3,
-  },
-  activeChip: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  activeChipText: {
-    color: '#ffffff',
-    fontWeight: '700',
   },
   footer: {
-    flexDirection: 'row',
-    padding: spacing.md,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
-    gap: spacing.md,
-  },
-  resetButton: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.15)',
-    borderRadius: borderRadius.md,
-    backgroundColor: '#ffffff',
-  },
-  resetText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    fontWeight: '700',
-  },
-  applyButton: {
-    flex: 2,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-  },
-  applyText: {
-    ...typography.body,
-    color: '#ffffff',
-    fontWeight: '700',
   },
 });

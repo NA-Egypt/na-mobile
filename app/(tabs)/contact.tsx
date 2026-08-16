@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,23 +9,36 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Paperclip, Send, CheckCircle2, Clock, MessageSquare, X, Mail, Phone, User } from 'lucide-react-native';
+import {
+  Paperclip,
+  Send,
+  CheckCircle2,
+  Clock,
+  MessageSquare,
+  X,
+  Image as ImageIcon,
+  FileText,
+} from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { addOutboxAction } from '../../src/database/outboxWorker';
 import { database } from '../../src/database';
 import OutboxAction from '../../src/database/models/OutboxAction';
-import { colors, spacing, borderRadius, typography, shadows } from '../../src/theme';
+import { useAppTheme } from '../../src/theme';
+import { AppText, Badge, AppButton, LanguageSwitcher } from '../../src/components/ui';
+import { haptic } from '../../src/utils/haptics';
 
 export default function ContactScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
+  const { colors, borderRadius, shadows } = useAppTheme();
 
   const [senderName, setSenderName] = useState('');
   const [senderContact, setSenderContact] = useState('');
   const [subject, setSubject] = useState('');
   const [details, setDetails] = useState('');
   const [attachment, setAttachment] = useState<{ uri: string; name: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [outboxItems, setOutboxItems] = useState<OutboxAction[]>([]);
 
@@ -51,6 +63,7 @@ export default function ContactScreen() {
   }, []);
 
   const handlePickDocument = async () => {
+    haptic.selection();
     try {
       const res = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
@@ -60,6 +73,7 @@ export default function ContactScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const file = res.assets[0];
         setAttachment({ uri: file.uri, name: file.name });
+        haptic.light();
       }
     } catch (e) {
       console.warn('Document Picker error:', e);
@@ -67,6 +81,7 @@ export default function ContactScreen() {
   };
 
   const handlePickImage = async () => {
+    haptic.selection();
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -77,6 +92,7 @@ export default function ContactScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const img = res.assets[0];
         setAttachment({ uri: img.uri, name: img.fileName || 'attached_photo.jpg' });
+        haptic.light();
       }
     } catch (e) {
       console.warn('Image Picker error:', e);
@@ -85,6 +101,7 @@ export default function ContactScreen() {
 
   const handleSubmit = async () => {
     if (!details.trim()) {
+      haptic.warning();
       Alert.alert(
         isAr ? 'تنبيه' : 'Notice',
         isAr ? 'يرجى كتابة رسالتك أو استفسارك قبل الإرسال.' : 'Please enter your message or inquiry.'
@@ -92,203 +109,299 @@ export default function ContactScreen() {
       return;
     }
 
-    const payload = {
-      name: senderName.trim() || 'عضو زمالة NA',
-      contact: senderContact.trim() || null,
-      subject: subject.trim() || 'استفسار عام من تطبيق الهاتف',
-      message: details.trim(),
-      attachment_name: attachment?.name || null,
-      attachment_uri: attachment?.uri || null,
-      submitted_at: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        name: senderName.trim() || 'عضو زمالة NA',
+        contact: senderContact.trim() || null,
+        subject: subject.trim() || 'استفسار عام من تطبيق الهاتف',
+        message: details.trim(),
+        attachment_name: attachment?.name || null,
+        attachment_uri: attachment?.uri || null,
+        submitted_at: new Date().toISOString(),
+      };
 
-    await addOutboxAction('/contact-us', 'POST', payload);
+      await addOutboxAction('/contact-us', 'POST', payload);
+      haptic.success();
 
-    Alert.alert(
-      isAr ? 'تم حفظ الرسالة' : 'Message Saved',
-      isAr
-        ? 'تم حفظ استفسارك بنجاح، وسيتم إرساله للجنة العلاقات العامة والخدمة فور توفر الاتصال بالإنترنت.'
-        : 'Your message has been saved and will send automatically when online.'
-    );
+      Alert.alert(
+        isAr ? 'تم حفظ الرسالة' : 'Message Saved',
+        isAr
+          ? 'تم حفظ استفسارك بنجاح، وسيتم إرساله للجنة العلاقات العامة والخدمة فور توفر الاتصال بالإنترنت.'
+          : 'Your message has been saved and will send automatically when online.'
+      );
 
-    setSenderName('');
-    setSenderContact('');
-    setSubject('');
-    setDetails('');
-    setAttachment(null);
+      setSenderName('');
+      setSenderContact('');
+      setSubject('');
+      setDetails('');
+      setAttachment(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <View style={styles.screenWrapper}>
-      <SafeAreaView style={styles.safeHeader} edges={['top']}>
+    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
+      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
         <View style={styles.headerBanner}>
-          <View style={styles.iconCircle}>
-            <MessageSquare size={22} color="#ffffff" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight + '40' }]}>
+            <MessageSquare size={20} color={colors.accent} />
           </View>
           <View style={styles.headerTextCol}>
-            <Text style={[styles.headerTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+            <AppText variant="h3" color="#ffffff" weight="800">
               {isAr ? 'اتصل بنا • الاستفسارات العامة' : 'Contact Us • General Inquiries'}
-            </Text>
-            <Text style={[styles.headerSubtitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+            </AppText>
+            <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
               {isAr
                 ? 'تواصل مع لجنة الخدمة والعلاقات العامة لزمالة NA مصر'
-                : 'Get in touch with NA Egypt Public Relations & Service Committee'}
-            </Text>
+                : 'Get in touch with NA Egypt PR & Service Committee'}
+            </AppText>
           </View>
+          <LanguageSwitcher />
         </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Contact Form Card */}
-        <View style={[styles.formCard, shadows.card]}>
-          {/* Name Field */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'الاسم (اختياري)' : 'Name (Optional)'}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' },
-              ]}
-              placeholder={isAr ? 'أدخل اسمك الأول أو كنيتك...' : 'Enter your name...'}
-              placeholderTextColor={colors.textMuted}
-              value={senderName}
-              onChangeText={setSenderName}
-            />
-          </View>
-
-          {/* Contact (Phone / Email) */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'رقم الهاتف أو البريد الإلكتروني (اختياري للرد)' : 'Phone or Email (Optional)'}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' },
-              ]}
-              placeholder={isAr ? '010xxxxxxx أو example@email.com' : 'Phone number or email...'}
-              placeholderTextColor={colors.textMuted}
-              value={senderContact}
-              onChangeText={setSenderContact}
-              keyboardType="email-address"
-            />
-          </View>
-
-          {/* Subject Field */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'موضوع الاستفسار' : 'Subject'}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' },
-              ]}
-              placeholder={isAr ? 'مثال: استفسار عن مواعيد الاجتماعات أو الخدمة' : 'e.g. Question about meetings or service'}
-              placeholderTextColor={colors.textMuted}
-              value={subject}
-              onChangeText={setSubject}
-            />
-          </View>
-
-          {/* Message Details */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'نص الرسالة / تفاصيل الاستفسار *' : 'Message Details *'}
-            </Text>
-            <TextInput
-              style={[
-                styles.textArea,
-                { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' },
-              ]}
-              placeholder={
-                isAr
-                  ? 'اكتب رسالتك أو استفسارك هنا بكل وضوح...'
-                  : 'Write your message or inquiry here...'
-              }
-              placeholderTextColor={colors.textMuted}
-              value={details}
-              onChangeText={setDetails}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-
-          {/* Attachment Selector */}
-          <View style={styles.attachmentSection}>
-            <Text style={[styles.label, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'إرفاق ملف أو صورة (اختياري)' : 'Attach File or Image (Optional)'}
-            </Text>
-            <View style={styles.attachButtonsRow}>
-              <TouchableOpacity
-                style={styles.attachBtn}
-                onPress={handlePickDocument}
-                activeOpacity={0.8}
-              >
-                <Paperclip size={16} color={colors.primary} style={{ marginEnd: 6 }} />
-                <Text style={styles.attachBtnText}>{isAr ? 'مستند / PDF' : 'Document / PDF'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.attachBtn}
-                onPress={handlePickImage}
-                activeOpacity={0.8}
-              >
-                <Paperclip size={16} color={colors.primary} style={{ marginEnd: 6 }} />
-                <Text style={styles.attachBtnText}>{isAr ? 'صورة من الهاتف' : 'Photo'}</Text>
-              </TouchableOpacity>
+      <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Contact Form Card */}
+          <View
+            style={[
+              styles.formCard,
+              shadows.card,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.cardBorder,
+                borderRadius: borderRadius.card,
+              },
+            ]}
+          >
+            {/* Name Field */}
+            <View style={styles.inputGroup}>
+              <AppText variant="label" color={colors.primary} weight="700" style={styles.label}>
+                {isAr ? 'الاسم (اختياري)' : 'Name (Optional)'}
+              </AppText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.cardBorder,
+                    borderRadius: borderRadius.md,
+                    color: colors.textPrimary,
+                    textAlign: isAr ? 'right' : 'left',
+                  },
+                ]}
+                placeholder={isAr ? 'أدخل اسمك الأول أو كنيتك...' : 'Enter your name...'}
+                placeholderTextColor={colors.textMuted}
+                value={senderName}
+                onChangeText={setSenderName}
+              />
             </View>
 
-            {attachment && (
-              <View style={styles.selectedAttachmentBox}>
-                <Paperclip size={16} color={colors.primary} style={{ marginEnd: 6 }} />
-                <Text style={styles.selectedAttachmentText} numberOfLines={1}>
-                  {attachment.name}
-                </Text>
-                <TouchableOpacity onPress={() => setAttachment(null)} hitSlop={8}>
-                  <X size={16} color={colors.danger} />
+            {/* Contact (Phone / Email) */}
+            <View style={styles.inputGroup}>
+              <AppText variant="label" color={colors.primary} weight="700" style={styles.label}>
+                {isAr ? 'رقم الهاتف أو البريد الإلكتروني (اختياري للرد)' : 'Phone or Email (Optional)'}
+              </AppText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.cardBorder,
+                    borderRadius: borderRadius.md,
+                    color: colors.textPrimary,
+                    textAlign: isAr ? 'right' : 'left',
+                  },
+                ]}
+                placeholder={isAr ? '010xxxxxxx أو example@email.com' : 'Phone number or email...'}
+                placeholderTextColor={colors.textMuted}
+                value={senderContact}
+                onChangeText={setSenderContact}
+                keyboardType="email-address"
+              />
+            </View>
+
+            {/* Subject Field */}
+            <View style={styles.inputGroup}>
+              <AppText variant="label" color={colors.primary} weight="700" style={styles.label}>
+                {isAr ? 'موضوع الاستفسار' : 'Subject'}
+              </AppText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.cardBorder,
+                    borderRadius: borderRadius.md,
+                    color: colors.textPrimary,
+                    textAlign: isAr ? 'right' : 'left',
+                  },
+                ]}
+                placeholder={isAr ? 'مثال: استفسار عن مواعيد الاجتماعات أو الخدمة' : 'e.g. Question about meetings or service'}
+                placeholderTextColor={colors.textMuted}
+                value={subject}
+                onChangeText={setSubject}
+              />
+            </View>
+
+            {/* Message Details */}
+            <View style={styles.inputGroup}>
+              <AppText variant="label" color={colors.primary} weight="700" style={styles.label}>
+                {isAr ? 'نص الرسالة / تفاصيل الاستفسار *' : 'Message Details *'}
+              </AppText>
+              <TextInput
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.cardBorder,
+                    borderRadius: borderRadius.md,
+                    color: colors.textPrimary,
+                    textAlign: isAr ? 'right' : 'left',
+                  },
+                ]}
+                placeholder={
+                  isAr
+                    ? 'اكتب رسالتك أو استفسارك هنا بكل وضوح...'
+                    : 'Write your message or inquiry here...'
+                }
+                placeholderTextColor={colors.textMuted}
+                value={details}
+                onChangeText={setDetails}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            {/* Attachment Selector */}
+            <View style={styles.attachmentSection}>
+              <AppText variant="label" color={colors.primary} weight="700" style={styles.label}>
+                {isAr ? 'إرفاق ملف أو صورة (اختياري)' : 'Attach File or Image (Optional)'}
+              </AppText>
+              <View style={styles.attachButtonsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.attachBtn,
+                    {
+                      backgroundColor: colors.bgSecondary,
+                      borderColor: colors.cardBorder,
+                      borderRadius: borderRadius.md,
+                    },
+                  ]}
+                  onPress={handlePickDocument}
+                  activeOpacity={0.8}
+                >
+                  <FileText size={15} color={colors.primary} style={{ marginEnd: 6 }} />
+                  <AppText variant="labelSmall" color={colors.primary} weight="600">
+                    {isAr ? 'مستند / PDF' : 'Document / PDF'}
+                  </AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.attachBtn,
+                    {
+                      backgroundColor: colors.bgSecondary,
+                      borderColor: colors.cardBorder,
+                      borderRadius: borderRadius.md,
+                    },
+                  ]}
+                  onPress={handlePickImage}
+                  activeOpacity={0.8}
+                >
+                  <ImageIcon size={15} color={colors.primary} style={{ marginEnd: 6 }} />
+                  <AppText variant="labelSmall" color={colors.primary} weight="600">
+                    {isAr ? 'صورة من الهاتف' : 'Photo'}
+                  </AppText>
                 </TouchableOpacity>
               </View>
-            )}
-          </View>
 
-          {/* Submit Button */}
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85}>
-            <Send size={18} color="#ffffff" style={{ marginEnd: 8 }} />
-            <Text style={styles.submitBtnText}>{isAr ? 'إرسال الرسالة' : 'Send Message'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Offline Outbox Queue */}
-        {outboxItems.length > 0 && (
-          <View style={styles.outboxSection}>
-            <Text style={[styles.outboxHeaderTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-              {isAr ? 'حالة الإرسال وقائمة الانتظار' : 'Transmission Status & Queue'}
-            </Text>
-            {outboxItems.map((item) => (
-              <View key={item.id} style={[styles.outboxCard, shadows.card]}>
-                <View style={styles.outboxHeader}>
-                  <Text style={styles.outboxEndpoint}>{item.endpoint}</Text>
-                  <View style={[styles.statusBadge, item.status === 'synced' ? styles.syncedBadge : styles.pendingBadge]}>
-                    {item.status === 'synced' ? (
-                      <CheckCircle2 size={12} color={colors.success} style={{ marginEnd: 4 }} />
-                    ) : (
-                      <Clock size={12} color={colors.warning} style={{ marginEnd: 4 }} />
-                    )}
-                    <Text style={[styles.statusText, item.status === 'synced' ? styles.syncedText : styles.pendingText]}>
-                      {item.status === 'synced' ? (isAr ? 'تم الإرسال بنجاح' : 'Sent') : (isAr ? 'معلق (بانتظار الإنترنت)' : 'Pending')}
-                    </Text>
-                  </View>
+              {attachment && (
+                <View
+                  style={[
+                    styles.selectedAttachmentBox,
+                    {
+                      backgroundColor: colors.accentLight,
+                      borderRadius: borderRadius.sm,
+                    },
+                  ]}
+                >
+                  <Paperclip size={15} color={colors.accentDark} style={{ marginEnd: 6 }} />
+                  <AppText variant="caption" color={colors.accentDark} weight="600" numberOfLines={1} style={{ flex: 1 }}>
+                    {attachment.name}
+                  </AppText>
+                  <TouchableOpacity
+                    onPress={() => {
+                      haptic.light();
+                      setAttachment(null);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <X size={16} color={colors.danger} />
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.outboxDate, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                  {new Date(item.createdAt || Date.now()).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
-                </Text>
-              </View>
-            ))}
+              )}
+            </View>
+
+            {/* Submit Button */}
+            <AppButton
+              title={isAr ? 'إرسال الرسالة' : 'Send Message'}
+              onPress={handleSubmit}
+              variant="primary"
+              size="lg"
+              loading={isSubmitting}
+              icon={<Send size={17} color="#ffffff" />}
+              fullWidth
+            />
           </View>
-        )}
-      </ScrollView>
+
+          {/* Offline Outbox Queue */}
+          {outboxItems.length > 0 && (
+            <View style={styles.outboxSection}>
+              <AppText variant="h4" color={colors.textPrimary} weight="700" style={{ marginBottom: 10 }}>
+                {isAr ? 'حالة الإرسال وقائمة الانتظار' : 'Transmission Status & Queue'}
+              </AppText>
+              {outboxItems.map((item) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.outboxCard,
+                    shadows.card,
+                    {
+                      backgroundColor: colors.cardBg,
+                      borderColor: colors.cardBorder,
+                      borderRadius: borderRadius.card,
+                    },
+                  ]}
+                >
+                  <View style={styles.outboxHeader}>
+                    <AppText variant="body" color={colors.textPrimary} weight="700">
+                      {item.endpoint}
+                    </AppText>
+                    <Badge
+                      label={item.status === 'synced' ? (isAr ? 'تم الإرسال' : 'Sent') : (isAr ? 'معلق' : 'Pending')}
+                      variant={item.status === 'synced' ? 'success' : 'warning'}
+                      size="sm"
+                      icon={
+                        item.status === 'synced' ? (
+                          <CheckCircle2 size={11} color={colors.success} />
+                        ) : (
+                          <Clock size={11} color={colors.warning} />
+                        )
+                      }
+                    />
+                  </View>
+                  <AppText variant="caption" color={colors.textMuted} style={{ marginTop: 4 }}>
+                    {new Date(item.createdAt || Date.now()).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -296,188 +409,94 @@ export default function ContactScreen() {
 const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
-    backgroundColor: '#f7fbff',
   },
   safeHeader: {
-    backgroundColor: colors.primary,
+    paddingBottom: 4,
   },
   headerBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginEnd: spacing.sm + 2,
+    marginEnd: 10,
   },
   headerTextCol: {
     flex: 1,
   },
-  headerTitle: {
-    ...typography.h2,
-    color: '#ffffff',
-    fontSize: 18,
-  },
-  headerSubtitle: {
-    ...typography.caption,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 2,
+  contentBody: {
+    flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   scrollContent: {
-    padding: spacing.md,
+    padding: 16,
   },
   formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: spacing.md + 2,
-    marginBottom: spacing.md,
+    padding: 18,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
   },
   inputGroup: {
-    marginBottom: spacing.md,
+    marginBottom: 14,
   },
   label: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: spacing.xs,
-    fontSize: 13,
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.12)',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    ...typography.body,
-    color: colors.textPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
   },
   textArea: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.12)',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    ...typography.body,
-    color: colors.textPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
     minHeight: 110,
     textAlignVertical: 'top',
   },
   attachmentSection: {
-    marginBottom: spacing.lg,
+    marginBottom: 20,
   },
   attachButtonsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 10,
   },
   attachBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
-  },
-  attachBtnText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.primary,
-    fontSize: 12,
   },
   selectedAttachmentBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e4f7fa',
-    padding: spacing.sm,
-    borderRadius: borderRadius.sm,
-    marginTop: spacing.sm,
-  },
-  selectedAttachmentText: {
-    ...typography.caption,
-    color: colors.primary,
-    flex: 1,
-    fontWeight: '600',
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-  },
-  submitBtnText: {
-    ...typography.body,
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 15,
+    padding: 10,
+    marginTop: 10,
   },
   outboxSection: {
-    marginTop: spacing.md,
-  },
-  outboxHeaderTitle: {
-    ...typography.h3,
-    color: colors.primary,
-    marginBottom: spacing.sm,
+    marginTop: 8,
   },
   outboxCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
   },
   outboxHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  outboxEndpoint: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
-  },
-  syncedBadge: {
-    backgroundColor: '#e6f4ea',
-  },
-  pendingBadge: {
-    backgroundColor: '#fff7ed',
-  },
-  statusText: {
-    ...typography.caption,
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  syncedText: {
-    color: colors.success,
-  },
-  pendingText: {
-    color: colors.warning,
-  },
-  outboxDate: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 4,
   },
 });

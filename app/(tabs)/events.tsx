@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -24,17 +23,19 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
-  Clock,
 } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { database } from '../../src/database';
 import EventModel from '../../src/database/models/Event';
 import { pullMasterData } from '../../src/database/sync';
-import { colors, spacing, borderRadius, typography, shadows } from '../../src/theme';
+import { useAppTheme } from '../../src/theme';
+import { AppText, Badge, AppButton, EmptyState, LanguageSwitcher } from '../../src/components/ui';
+import { haptic } from '../../src/utils/haptics';
 
 export default function EventsScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
+  const { colors, borderRadius, shadows } = useAppTheme();
 
   const [events, setEvents] = useState<EventModel[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
@@ -77,6 +78,7 @@ export default function EventsScreen() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    haptic.light();
     await pullMasterData();
     await loadEvents();
     setIsRefreshing(false);
@@ -85,8 +87,10 @@ export default function EventsScreen() {
   const handleScheduleNotification = async (event: EventModel) => {
     if (Platform.OS === 'web') return;
 
+    haptic.light();
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
+      haptic.warning();
       Alert.alert(
         isAr ? 'الصلاحيات مطلوبة' : 'Permission Required',
         isAr ? 'يرجى تفعيل صلاحيات الإشعارات من إعدادات الهاتف.' : 'Please enable notifications in device settings.'
@@ -107,6 +111,7 @@ export default function EventsScreen() {
       },
     });
 
+    haptic.success();
     setNotifiedEvents((prev) => ({ ...prev, [event.id]: true }));
     Alert.alert(
       isAr ? 'تم التفعيل' : 'Activated',
@@ -115,6 +120,7 @@ export default function EventsScreen() {
   };
 
   const handleOpenMap = (location: string, title: string) => {
+    haptic.selection();
     const query = encodeURIComponent(`${title}, ${location}, Egypt`);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
@@ -132,10 +138,12 @@ export default function EventsScreen() {
   const month = currentDate.getMonth();
 
   const prevMonth = () => {
+    haptic.selection();
     setCurrentDate(new Date(year, month - 1, 1));
   };
 
   const nextMonth = () => {
+    haptic.selection();
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
@@ -166,173 +174,365 @@ export default function EventsScreen() {
   const dayLabelsEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <View style={styles.screenWrapper}>
-      <SafeAreaView style={styles.safeHeader} edges={['top']}>
+    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
+      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
         {/* Header Banner */}
         <View style={styles.headerBanner}>
-          <View style={styles.iconCircle}>
-            <CalendarIcon size={22} color="#ffffff" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight + '40' }]}>
+            <CalendarIcon size={20} color={colors.accent} />
           </View>
           <View style={styles.headerTextCol}>
-            <Text style={[styles.headerTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+            <AppText variant="h3" color="#ffffff" weight="800">
               {isAr ? 'فعاليات وأنشطة الزمالة' : 'Events & Activities'}
-            </Text>
-            <Text style={[styles.headerSubtitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+            </AppText>
+            <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
               {isAr
-                ? 'مواعيد المؤتمرات، الأيام التعليمية، واجتماعات لجان الخدمة العامة'
+                ? 'مواعيد المؤتمرات، الأيام التعليمية، واجتماعات لجان الخدمة'
                 : 'Conventions, Learning Days, and Regional Committee Meetings'}
-            </Text>
+            </AppText>
           </View>
+          <LanguageSwitcher />
         </View>
 
         {/* View Mode Segmented Switch (Calendar / List) */}
         <View style={styles.modeSwitchWrapper}>
-          <View style={styles.modeSwitchContainer}>
+          <View style={[styles.modeSwitchContainer, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}>
             <TouchableOpacity
-              style={[styles.modeButton, viewMode === 'calendar' && styles.modeButtonActive]}
-              onPress={() => setViewMode('calendar')}
+              style={[
+                styles.modeButton,
+                viewMode === 'calendar' && [styles.modeButtonActive, { backgroundColor: colors.cardBg }],
+              ]}
+              onPress={() => {
+                haptic.selection();
+                setViewMode('calendar');
+              }}
               activeOpacity={0.8}
             >
-              <CalendarIcon size={16} color={viewMode === 'calendar' ? '#ffffff' : colors.primary} style={{ marginEnd: 6 }} />
-              <Text style={[styles.modeButtonText, viewMode === 'calendar' && styles.modeButtonTextActive]}>
-                {isAr ? 'عرض التقويم الشهري' : 'Calendar View'}
-              </Text>
+              <CalendarIcon
+                size={16}
+                color={viewMode === 'calendar' ? colors.primary : '#ffffff'}
+                style={{ marginEnd: 6 }}
+              />
+              <AppText
+                variant="label"
+                color={viewMode === 'calendar' ? colors.primary : '#ffffff'}
+                weight="700"
+              >
+                {isAr ? 'التقويم الشهري' : 'Calendar View'}
+              </AppText>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modeButton, viewMode === 'list' && styles.modeButtonActive]}
-              onPress={() => setViewMode('list')}
+              style={[
+                styles.modeButton,
+                viewMode === 'list' && [styles.modeButtonActive, { backgroundColor: colors.cardBg }],
+              ]}
+              onPress={() => {
+                haptic.selection();
+                setViewMode('list');
+              }}
               activeOpacity={0.8}
             >
-              <List size={16} color={viewMode === 'list' ? '#ffffff' : colors.primary} style={{ marginEnd: 6 }} />
-              <Text style={[styles.modeButtonText, viewMode === 'list' && styles.modeButtonTextActive]}>
+              <List
+                size={16}
+                color={viewMode === 'list' ? colors.primary : '#ffffff'}
+                style={{ marginEnd: 6 }}
+              />
+              <AppText
+                variant="label"
+                color={viewMode === 'list' ? colors.primary : '#ffffff'}
+                weight="700"
+              >
                 {isAr ? 'عرض القائمة' : 'List View'}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
 
-      {viewMode === 'calendar' ? (
-        <ScrollView
-          contentContainerStyle={styles.calendarScrollContent}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
-          }
-        >
-          {/* Month Header Navigation */}
-          <View style={[styles.monthCard, shadows.card]}>
-            <View style={styles.monthHeaderRow}>
-              <TouchableOpacity onPress={isAr ? nextMonth : prevMonth} hitSlop={10} style={styles.navArrowBtn}>
-                <ChevronRight size={22} color={colors.primary} />
-              </TouchableOpacity>
+      <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
+        {viewMode === 'calendar' ? (
+          <ScrollView
+            contentContainerStyle={styles.calendarScrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.accent, colors.primary]}
+                tintColor={colors.accent}
+              />
+            }
+          >
+            {/* Month Header Navigation */}
+            <View
+              style={[
+                styles.monthCard,
+                shadows.card,
+                {
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.cardBorder,
+                  borderRadius: borderRadius.card,
+                },
+              ]}
+            >
+              <View style={styles.monthHeaderRow}>
+                <TouchableOpacity
+                  onPress={isAr ? nextMonth : prevMonth}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.navArrowBtn, { backgroundColor: colors.bgSecondary }]}
+                >
+                  <ChevronRight size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
 
-              <Text style={styles.monthTitleText}>
-                {isAr ? `${monthNamesAr[month]} ${year}` : `${monthNamesEn[month]} ${year}`}
-              </Text>
+                <AppText variant="h3" color={colors.textPrimary} weight="700">
+                  {isAr ? `${monthNamesAr[month]} ${year}` : `${monthNamesEn[month]} ${year}`}
+                </AppText>
 
-              <TouchableOpacity onPress={isAr ? prevMonth : nextMonth} hitSlop={10} style={styles.navArrowBtn}>
-                <ChevronLeft size={22} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Day of Week Headers */}
-            <View style={styles.dayLabelsRow}>
-              {(isAr ? dayLabelsAr : dayLabelsEn).map((lbl, idx) => (
-                <Text key={idx} style={styles.dayLabelText}>{lbl}</Text>
-              ))}
-            </View>
-
-            {/* Calendar Grid */}
-            <View style={styles.daysGrid}>
-              {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                <View key={`empty-${i}`} style={styles.dayCell} />
-              ))}
-
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const dayNum = i + 1;
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                const hasEvents = !!eventsByDate[dateStr]?.length;
-                const isSelected = selectedDateStr === dateStr;
-
-                return (
-                  <TouchableOpacity
-                    key={`day-${dayNum}`}
-                    style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      hasEvents && !isSelected && styles.dayCellHasEvents,
-                    ]}
-                    onPress={() => setSelectedDateStr(dateStr)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.dayNumberText,
-                        isSelected && styles.dayNumberTextSelected,
-                        hasEvents && !isSelected && styles.dayNumberTextHasEvents,
-                      ]}
-                    >
-                      {dayNum}
-                    </Text>
-                    {hasEvents && (
-                      <View
-                        style={[
-                          styles.eventDot,
-                          isSelected && { backgroundColor: '#ffffff' },
-                        ]}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Selected Day Events List */}
-          <View style={styles.dayAgendaSection}>
-            <View style={styles.dayAgendaHeaderRow}>
-              <Text style={[styles.dayAgendaTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr
-                  ? `أجندة يوم: ${selectedDateStr}`
-                  : `Schedule for ${selectedDateStr}`}
-              </Text>
-              <Text style={styles.dayAgendaCount}>
-                {isAr ? `${selectedDayEvents.length} فعالية` : `${selectedDayEvents.length} events`}
-              </Text>
-            </View>
-
-            {selectedDayEvents.length === 0 ? (
-              <View style={[styles.emptyDayCard, shadows.card]}>
-                <CalendarX size={36} color={colors.textMuted} />
-                <Text style={[styles.emptyDayText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                  {isAr
-                    ? 'لا توجد فعاليات أو اجتماعات مجدولة في هذا اليوم.'
-                    : 'No events scheduled for this day.'}
-                </Text>
+                <TouchableOpacity
+                  onPress={isAr ? prevMonth : nextMonth}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.navArrowBtn, { backgroundColor: colors.bgSecondary }]}
+                >
+                  <ChevronLeft size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
               </View>
-            ) : (
-              selectedDayEvents.map((item) => (
-                <View key={item.id} style={[styles.card, shadows.card]}>
-                  <Text style={[styles.cardTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+
+              {/* Day of Week Headers */}
+              <View style={[styles.dayLabelsRow, { borderColor: colors.borderSubtle }]}>
+                {(isAr ? dayLabelsAr : dayLabelsEn).map((lbl, idx) => (
+                  <AppText key={idx} variant="caption" color={colors.textMuted} weight="700" style={styles.dayLabelText}>
+                    {lbl}
+                  </AppText>
+                ))}
+              </View>
+
+              {/* Calendar Grid */}
+              <View style={styles.daysGrid}>
+                {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                  <View key={`empty-${i}`} style={styles.dayCell} />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const hasEvents = !!eventsByDate[dateStr]?.length;
+                  const isSelected = selectedDateStr === dateStr;
+
+                  return (
+                    <TouchableOpacity
+                      key={`day-${dayNum}`}
+                      style={[
+                        styles.dayCell,
+                        isSelected && { backgroundColor: colors.primary },
+                        hasEvents && !isSelected && { backgroundColor: colors.accentLight },
+                      ]}
+                      onPress={() => {
+                        haptic.selection();
+                        setSelectedDateStr(dateStr);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <AppText
+                        variant="labelSmall"
+                        color={
+                          isSelected
+                            ? '#ffffff'
+                            : hasEvents
+                            ? colors.accentDark
+                            : colors.textPrimary
+                        }
+                        weight={isSelected || hasEvents ? '700' : '500'}
+                      >
+                        {dayNum}
+                      </AppText>
+                      {hasEvents && (
+                        <View
+                          style={[
+                            styles.eventDot,
+                            {
+                              backgroundColor: isSelected ? '#ffffff' : colors.accent,
+                            },
+                          ]}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Selected Day Events Section */}
+            <View style={styles.dayAgendaSection}>
+              <View style={styles.dayAgendaHeaderRow}>
+                <AppText variant="h4" color={colors.textPrimary} weight="700">
+                  {isAr ? `أجندة يوم: ${selectedDateStr}` : `Schedule for ${selectedDateStr}`}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted} weight="700">
+                  {isAr ? `${selectedDayEvents.length} فعالية` : `${selectedDayEvents.length} events`}
+                </AppText>
+              </View>
+
+              {selectedDayEvents.length === 0 ? (
+                <EmptyState
+                  icon={<CalendarX size={36} color={colors.textMuted} />}
+                  title={isAr ? 'لا توجد فعاليات مجدولة' : 'No Events Scheduled'}
+                  description={
+                    isAr
+                      ? 'لا توجد فعاليات أو اجتماعات عامة مسجلة في هذا اليوم.'
+                      : 'No events or committee meetings scheduled for this date.'
+                  }
+                />
+              ) : (
+                selectedDayEvents.map((item) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.card,
+                      shadows.card,
+                      {
+                        backgroundColor: colors.cardBg,
+                        borderColor: colors.cardBorder,
+                        borderRadius: borderRadius.card,
+                      },
+                    ]}
+                  >
+                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.cardTitle}>
+                      {item.title}
+                    </AppText>
+
+                    {item.organizer ? (
+                      <View style={styles.infoRow}>
+                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                          <UserCheck size={14} color={colors.accentDark} />
+                        </View>
+                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                          {isAr ? `المنظم: ${item.organizer}` : `Organizer: ${item.organizer}`}
+                        </AppText>
+                      </View>
+                    ) : null}
+
+                    {item.description ? (
+                      <AppText variant="bodySmall" color={colors.textSecondary} style={styles.cardDescription}>
+                        {item.description}
+                      </AppText>
+                    ) : null}
+
+                    {item.location ? (
+                      <TouchableOpacity
+                        style={styles.infoRow}
+                        onPress={() => handleOpenMap(item.location || '', item.title || '')}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                          <MapPin size={14} color={colors.accentDark} />
+                        </View>
+                        <AppText variant="bodySmall" color={colors.accentDark} style={styles.locationLink}>
+                          {item.location}
+                        </AppText>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    <AppButton
+                      title={notifiedEvents[item.id] ? (isAr ? 'تم تفعيل التنبيه' : 'Reminder Active') : t('events.notify_me')}
+                      onPress={() => handleScheduleNotification(item)}
+                      variant={notifiedEvents[item.id] ? 'secondary' : 'primary'}
+                      size="sm"
+                      icon={
+                        notifiedEvents[item.id] ? (
+                          <CheckCircle size={15} color="#ffffff" />
+                        ) : (
+                          <Bell size={15} color="#ffffff" />
+                        )
+                      }
+                      style={{ marginTop: 12 }}
+                    />
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        ) : (
+          /* Full Chronological List View */
+          <FlatList
+            data={events}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === 'android'}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.accent, colors.primary]}
+                tintColor={colors.accent}
+              />
+            }
+            renderItem={({ item }) => {
+              const startDateObj = item.startDate ? new Date(item.startDate) : null;
+              const formattedDate = startDateObj
+                ? startDateObj.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '';
+
+              return (
+                <View
+                  style={[
+                    styles.card,
+                    shadows.card,
+                    {
+                      backgroundColor: colors.cardBg,
+                      borderColor: colors.cardBorder,
+                      borderRadius: borderRadius.card,
+                    },
+                  ]}
+                >
+                  <View style={styles.badgeRow}>
+                    {formattedDate ? (
+                      <Badge
+                        label={formattedDate}
+                        variant="accent"
+                        size="sm"
+                        icon={<CalendarIcon size={12} color={colors.accentDark} />}
+                      />
+                    ) : null}
+
+                    {item.recurrence ? (
+                      <Badge
+                        label={item.recurrence}
+                        variant="neutral"
+                        size="sm"
+                        icon={<Repeat size={12} color={colors.textSecondary} />}
+                      />
+                    ) : null}
+                  </View>
+
+                  <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.cardTitle}>
                     {item.title}
-                  </Text>
+                  </AppText>
 
                   {item.organizer ? (
                     <View style={styles.infoRow}>
-                      <View style={styles.iconWrapper}>
-                        <UserCheck size={14} color={colors.primary} />
+                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                        <UserCheck size={14} color={colors.accentDark} />
                       </View>
-                      <Text style={[styles.infoText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                        {isAr ? `المنظم: ${item.organizer}` : `Organizer: ${item.organizer}`}
-                      </Text>
+                      <AppText variant="bodySmall" color={colors.textSecondary}>
+                        {isAr ? `الجهة المنظمة: ${item.organizer}` : `Organizer: ${item.organizer}`}
+                      </AppText>
                     </View>
                   ) : null}
 
                   {item.description ? (
-                    <Text style={[styles.cardDescription, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                    <AppText variant="bodySmall" color={colors.textSecondary} style={styles.cardDescription}>
                       {item.description}
-                    </Text>
+                    </AppText>
                   ) : null}
 
                   {item.location ? (
@@ -341,147 +541,46 @@ export default function EventsScreen() {
                       onPress={() => handleOpenMap(item.location || '', item.title || '')}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.iconWrapper}>
-                        <MapPin size={14} color={colors.primary} />
+                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                        <MapPin size={14} color={colors.accentDark} />
                       </View>
-                      <Text style={[styles.infoText, styles.locationLink, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+                      <AppText variant="bodySmall" color={colors.accentDark} style={styles.locationLink}>
                         {item.location}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   ) : null}
 
-                  <TouchableOpacity
-                    style={[styles.notifyButton, notifiedEvents[item.id] && styles.notifyButtonActive]}
+                  <AppButton
+                    title={notifiedEvents[item.id] ? (isAr ? 'تم تفعيل التنبيه' : 'Reminder Active') : t('events.notify_me')}
                     onPress={() => handleScheduleNotification(item)}
-                    activeOpacity={0.85}
-                  >
-                    {notifiedEvents[item.id] ? (
-                      <>
-                        <CheckCircle size={16} color="#ffffff" style={{ marginEnd: spacing.xs }} />
-                        <Text style={styles.notifyButtonText}>
-                          {isAr ? 'تم تفعيل التنبيه بنجاح' : 'Reminder Scheduled'}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Bell size={16} color="#ffffff" style={{ marginEnd: spacing.xs }} />
-                        <Text style={styles.notifyButtonText}>{t('events.notify_me')}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                    variant={notifiedEvents[item.id] ? 'secondary' : 'primary'}
+                    size="sm"
+                    icon={
+                      notifiedEvents[item.id] ? (
+                        <CheckCircle size={15} color="#ffffff" />
+                      ) : (
+                        <Bell size={15} color="#ffffff" />
+                      )
+                    }
+                    style={{ marginTop: 12 }}
+                  />
                 </View>
-              ))
-            )}
-          </View>
-        </ScrollView>
-      ) : (
-        /* Full Chronological List View */
-        <FlatList
-          data={events}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
-          }
-          renderItem={({ item }) => {
-            const startDateObj = item.startDate ? new Date(item.startDate) : null;
-            const formattedDate = startDateObj
-              ? startDateObj.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
-                  weekday: 'short',
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '';
-
-            return (
-              <View style={[styles.card, shadows.card]}>
-                <View style={styles.badgeRow}>
-                  {formattedDate ? (
-                    <View style={styles.dateBadge}>
-                      <CalendarIcon size={13} color="#0891b2" style={{ marginEnd: 4 }} />
-                      <Text style={styles.dateBadgeText}>{formattedDate}</Text>
-                    </View>
-                  ) : null}
-
-                  {item.recurrence ? (
-                    <View style={styles.recurrenceBadge}>
-                      <Repeat size={12} color={colors.primary} style={{ marginEnd: 4 }} />
-                      <Text style={styles.recurrenceBadgeText}>{item.recurrence}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <Text style={[styles.cardTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                  {item.title}
-                </Text>
-
-                {item.organizer ? (
-                  <View style={styles.infoRow}>
-                    <View style={styles.iconWrapper}>
-                      <UserCheck size={14} color={colors.primary} />
-                    </View>
-                    <Text style={[styles.infoText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                      {isAr ? `الجهة المنظمة: ${item.organizer}` : `Organizer: ${item.organizer}`}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {item.description ? (
-                  <Text style={[styles.cardDescription, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                    {item.description}
-                  </Text>
-                ) : null}
-
-                {item.location ? (
-                  <TouchableOpacity
-                    style={styles.infoRow}
-                    onPress={() => handleOpenMap(item.location || '', item.title || '')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.iconWrapper}>
-                      <MapPin size={14} color={colors.primary} />
-                    </View>
-                    <Text style={[styles.infoText, styles.locationLink, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                      {item.location}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-
-                <TouchableOpacity
-                  style={[styles.notifyButton, notifiedEvents[item.id] && styles.notifyButtonActive]}
-                  onPress={() => handleScheduleNotification(item)}
-                  activeOpacity={0.85}
-                >
-                  {notifiedEvents[item.id] ? (
-                    <>
-                      <CheckCircle size={16} color="#ffffff" style={{ marginEnd: spacing.xs }} />
-                      <Text style={styles.notifyButtonText}>
-                        {isAr ? 'تم تفعيل التنبيه بنجاح' : 'Reminder Scheduled'}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Bell size={16} color="#ffffff" style={{ marginEnd: spacing.xs }} />
-                      <Text style={styles.notifyButtonText}>{t('events.notify_me')}</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <CalendarX size={52} color={colors.textMuted} />
-              <Text style={[styles.emptyTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
-                {isAr ? 'لا توجد فعاليات مسجلة حالياً' : 'No events registered'}
-              </Text>
-            </View>
-          }
-        />
-      )}
+              );
+            }}
+            ListEmptyComponent={
+              <EmptyState
+                icon={<CalendarX size={44} color={colors.accent} />}
+                title={isAr ? 'لا توجد فعاليات مسجلة حالياً' : 'No Events Registered'}
+                description={
+                  isAr
+                    ? 'سيتم عرض المؤتمرات والأيام التعليمية فور جدولتها.'
+                    : 'Conventions and learning days will appear here once scheduled.'
+                }
+              />
+            }
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -489,49 +588,34 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
-    backgroundColor: '#f7fbff',
   },
   safeHeader: {
-    backgroundColor: colors.primary,
+    paddingBottom: 4,
   },
   headerBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginEnd: spacing.sm + 2,
+    marginEnd: 10,
   },
   headerTextCol: {
     flex: 1,
   },
-  headerTitle: {
-    ...typography.h2,
-    color: '#ffffff',
-    fontSize: 18,
-  },
-  headerSubtitle: {
-    ...typography.caption,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 2,
-  },
   modeSwitchWrapper: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   modeSwitchContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     borderRadius: 14,
     padding: 3,
     gap: 4,
@@ -541,61 +625,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm - 1,
+    paddingVertical: 8,
     borderRadius: 11,
   },
   modeButtonActive: {
-    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  modeButtonText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-  },
-  modeButtonTextActive: {
-    color: colors.primary,
+  contentBody: {
+    flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   calendarScrollContent: {
-    padding: spacing.md,
+    padding: 16,
   },
   monthCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
   },
   monthHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  monthTitleText: {
-    ...typography.h3,
-    color: colors.primary,
-    fontSize: 17,
+    marginBottom: 14,
   },
   navArrowBtn: {
     padding: 6,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
   },
   dayLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
     borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
-    paddingBottom: spacing.xs,
+    paddingBottom: 6,
   },
   dayLabelText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.textMuted,
-    width: 38,
+    width: 36,
     textAlign: 'center',
     fontSize: 11,
   },
@@ -605,187 +677,65 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: '14.28%',
-    height: 42,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 10,
     marginVertical: 2,
   },
-  dayCellSelected: {
-    backgroundColor: colors.primary,
-  },
-  dayCellHasEvents: {
-    backgroundColor: '#e4f7fa',
-  },
-  dayNumberText: {
-    ...typography.body,
-    fontSize: 13,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  dayNumberTextSelected: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  dayNumberTextHasEvents: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
   eventDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     marginTop: 2,
   },
   dayAgendaSection: {
-    marginTop: spacing.xs,
+    marginTop: 4,
   },
   dayAgendaHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 12,
     paddingHorizontal: 4,
   },
-  dayAgendaTitle: {
-    ...typography.h3,
-    color: colors.primary,
-    fontSize: 15,
-  },
-  dayAgendaCount: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontWeight: '700',
-  },
-  emptyDayCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
-  },
-  emptyDayText: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-  },
   listContent: {
-    padding: spacing.md,
+    padding: 16,
     flexGrow: 1,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: spacing.md + 2,
-    marginBottom: spacing.md,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.10)',
   },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs + 2,
-    marginBottom: spacing.sm,
-  },
-  dateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e4f7fa',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-  },
-  dateBadgeText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: '#0891b2',
-    fontSize: 11,
-  },
-  recurrenceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(50, 85, 127, 0.08)',
-  },
-  recurrenceBadgeText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.primary,
-    fontSize: 11,
+    gap: 6,
+    marginBottom: 8,
   },
   cardTitle: {
-    ...typography.h3,
-    color: colors.primary,
-    fontSize: 16,
-    marginBottom: spacing.xs,
+    marginBottom: 6,
   },
   cardDescription: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    lineHeight: 21,
+    marginTop: 4,
+    marginBottom: 8,
+    lineHeight: 20,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xs + 2,
+    marginTop: 6,
   },
   iconWrapper: {
-    width: 26,
-    height: 26,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#f1f5f9',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginEnd: spacing.xs + 2,
-  },
-  infoText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 13,
-    flex: 1,
+    marginEnd: 8,
   },
   locationLink: {
-    color: colors.primary,
     textDecorationLine: 'underline',
-  },
-  notifyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 2,
-    marginTop: spacing.md,
-  },
-  notifyButtonActive: {
-    backgroundColor: colors.success,
-  },
-  notifyButtonText: {
-    ...typography.body,
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    marginTop: spacing.xl * 1.5,
-  },
-  emptyTitle: {
-    ...typography.h3,
-    color: colors.primary,
-    marginTop: spacing.md,
-    textAlign: 'center',
   },
 });

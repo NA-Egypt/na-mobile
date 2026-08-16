@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   FlatList,
   RefreshControl,
-  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Search, SlidersHorizontal, MapPinOff, RefreshCw, Languages, Check } from 'lucide-react-native';
+import { MapPinOff } from 'lucide-react-native';
 import { database } from '../../src/database';
 import Meeting from '../../src/database/models/Meeting';
 import City from '../../src/database/models/City';
@@ -19,17 +16,37 @@ import Day from '../../src/database/models/Day';
 import { MeetingCard } from '../../src/components/MeetingCard';
 import { FilterModal, FilterOptions } from '../../src/components/FilterModal';
 import { NALogo } from '../../src/components/NALogo';
+import {
+  AppText,
+  SearchBar,
+  FilterChips,
+  ActiveFilterItem,
+  EmptyState,
+  MeetingCardSkeleton,
+  LanguageSwitcher,
+} from '../../src/components/ui';
 import { pullMasterData } from '../../src/database/sync';
-import { colors, spacing, borderRadius, typography, shadows } from '../../src/theme';
+import { useAppTheme } from '../../src/theme';
+import { useAppStore } from '../../src/store/appStore';
+import { haptic } from '../../src/utils/haptics';
 
 export default function MeetingFinderScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
+  const { colors, spacing, borderRadius } = useAppTheme();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+
+  const {
+    recentSearches,
+    addRecentSearch,
+    clearRecentSearches,
+    bookmarks,
+    toggleBookmark,
+  } = useAppStore();
 
   const [filters, setFilters] = useState<FilterOptions>({
     cityId: null,
@@ -43,11 +60,6 @@ export default function MeetingFinderScreen() {
   const [cities, setCities] = useState<Array<{ id: string; name: string }>>([]);
   const [days, setDays] = useState<Array<{ id: string; name: string }>>([]);
 
-  const toggleLanguage = () => {
-    const nextLang = isAr ? 'en' : 'ar';
-    i18n.changeLanguage(nextLang);
-  };
-
   const loadDataFromLocalDB = useCallback(async () => {
     try {
       const meetingsCollection = database.get<Meeting>('meetings');
@@ -59,35 +71,40 @@ export default function MeetingFinderScreen() {
       const allCities = await citiesCollection.query().fetch();
       const allDays = await daysCollection.query().fetch();
 
-      // Populate filter dropdowns from live database
-      setCities(allCities.map((c) => ({
-        id: c.remoteId || c.id,
-        name: isAr ? (c.arName || c.enName || '') : (c.enName || c.arName || ''),
-      })));
+      setCities(
+        allCities.map((c) => ({
+          id: c.remoteId || c.id,
+          name: isAr ? c.arName || c.enName || '' : c.enName || c.arName || '',
+        }))
+      );
 
-      setDays(allDays.map((d) => ({
-        id: d.remoteId || d.id,
-        name: isAr ? (d.arName || d.enName || '') : (d.enName || d.arName || ''),
-      })));
+      setDays(
+        allDays.map((d) => ({
+          id: d.remoteId || d.id,
+          name: isAr ? d.arName || d.enName || '' : d.enName || d.arName || '',
+        }))
+      );
 
       const populated = allMeetings.map((m) => {
-        const day = allDays.find((d) => String(d.remoteId) === String(m.dayId) || String(d.id) === String(m.dayId));
+        const day = allDays.find(
+          (d) => String(d.remoteId) === String(m.dayId) || String(d.id) === String(m.dayId)
+        );
 
         const groupName = isAr
-          ? (m.groupNameAr || m.groupNameEn || 'اجتماع زمالة NA')
-          : (m.groupNameEn || m.groupNameAr || 'NA Meeting');
+          ? m.groupNameAr || m.groupNameEn || 'اجتماع زمالة NA'
+          : m.groupNameEn || m.groupNameAr || 'NA Meeting';
 
         const cityName = isAr
-          ? (m.cityNameAr || m.cityNameEn || '')
-          : (m.cityNameEn || m.cityNameAr || '');
+          ? m.cityNameAr || m.cityNameEn || ''
+          : m.cityNameEn || m.cityNameAr || '';
 
         const neighborhoodName = isAr
-          ? (m.neighborhoodNameAr || m.neighborhoodNameEn || '')
-          : (m.neighborhoodNameEn || m.neighborhoodNameAr || '');
+          ? m.neighborhoodNameAr || m.neighborhoodNameEn || ''
+          : m.neighborhoodNameEn || m.neighborhoodNameAr || '';
 
         const dayName = isAr
-          ? (day?.arName || day?.enName || `يوم ${m.dayId}`)
-          : (day?.enName || day?.arName || `Day ${m.dayId}`);
+          ? day?.arName || day?.enName || `يوم ${m.dayId}`
+          : day?.enName || day?.arName || `Day ${m.dayId}`;
 
         return {
           id: m.id,
@@ -100,7 +117,7 @@ export default function MeetingFinderScreen() {
           dayId: String(m.dayId || ''),
           startTime: m.formattedStartTime || m.startTime || '',
           endTime: m.formattedEndTime || m.endTime || '',
-          address: isAr ? (m.addressAr || m.addressEn || '') : (m.addressEn || m.addressAr || ''),
+          address: isAr ? m.addressAr || m.addressEn || '' : m.addressEn || m.addressAr || '',
           type: m.type || 'open',
           lang: m.lang || 'arabic',
           notes: m.notes || '',
@@ -134,171 +151,272 @@ export default function MeetingFinderScreen() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    haptic.light();
     await pullMasterData();
     await loadDataFromLocalDB();
     setIsRefreshing(false);
   };
 
-  const toggleBookmark = (id: string) => {
-    setBookmarks((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleSearchSubmit = (text: string) => {
+    setSearchQuery(text);
+    if (text.trim()) {
+      addRecentSearch(text.trim());
+    }
   };
 
-  // Robust live filtering
-  const filteredMeetings = meetings.filter((m) => {
-    // 1. Text Search
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      query === '' ||
-      m.groupName.toLowerCase().includes(query) ||
-      m.cityName.toLowerCase().includes(query) ||
-      m.neighborhoodName.toLowerCase().includes(query) ||
-      m.address.toLowerCase().includes(query);
+  // Filter calculation
+  const filteredMeetings = useMemo(() => {
+    return meetings.filter((m) => {
+      const query = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        query === '' ||
+        m.groupName.toLowerCase().includes(query) ||
+        m.cityName.toLowerCase().includes(query) ||
+        m.neighborhoodName.toLowerCase().includes(query) ||
+        m.address.toLowerCase().includes(query);
 
-    // 2. Day Filter
-    const matchesDay = !filters.dayId || String(m.dayId) === String(filters.dayId);
+      const matchesDay = !filters.dayId || String(m.dayId) === String(filters.dayId);
 
-    // 3. City Filter
-    const matchesCity = (() => {
-      if (!filters.cityId) return true;
-      const selectedCity = cities.find((c) => c.id === filters.cityId);
-      if (!selectedCity) return true;
-      return (
-        m.cityName.toLowerCase().includes(selectedCity.name.toLowerCase()) ||
-        selectedCity.name.toLowerCase().includes(m.cityName.toLowerCase())
-      );
-    })();
+      const matchesCity = (() => {
+        if (!filters.cityId) return true;
+        const selectedCity = cities.find((c) => c.id === filters.cityId);
+        if (!selectedCity) return true;
+        return (
+          m.cityName.toLowerCase().includes(selectedCity.name.toLowerCase()) ||
+          selectedCity.name.toLowerCase().includes(m.cityName.toLowerCase())
+        );
+      })();
 
-    // 4. Group Type Filter
-    const matchesGroupType = !filters.groupType || m.groupType === filters.groupType;
+      const matchesGroupType = !filters.groupType || m.groupType === filters.groupType;
 
-    // 5. Language Filter
-    const matchesLang =
-      !filters.lang ||
-      m.lang === filters.lang ||
-      m.lang === 'both' ||
-      (filters.lang === 'arabic' && (m.lang === 'ar' || m.lang === 'arabic')) ||
-      (filters.lang === 'english' && (m.lang === 'en' || m.lang === 'english'));
+      const matchesLang =
+        !filters.lang ||
+        m.lang === filters.lang ||
+        m.lang === 'both' ||
+        (filters.lang === 'arabic' && (m.lang === 'ar' || m.lang === 'arabic')) ||
+        (filters.lang === 'english' && (m.lang === 'en' || m.lang === 'english'));
 
-    // 6. Meeting Type Filter (Open/Closed)
-    const matchesType = !filters.type || m.type === filters.type;
+      const matchesType = !filters.type || m.type === filters.type;
 
-    return matchesSearch && matchesDay && matchesCity && matchesGroupType && matchesLang && matchesType;
-  });
+      return matchesSearch && matchesDay && matchesCity && matchesGroupType && matchesLang && matchesType;
+    });
+  }, [meetings, searchQuery, filters, cities]);
 
-  const hasActiveFilters =
-    filters.dayId !== null ||
-    filters.cityId !== null ||
-    filters.groupType !== null ||
-    filters.lang !== null ||
-    filters.type !== null;
+  // Active filter items for chips
+  const activeFilterItems: ActiveFilterItem[] = useMemo(() => {
+    const list: ActiveFilterItem[] = [];
+
+    if (filters.dayId) {
+      const d = days.find((item) => String(item.id) === String(filters.dayId));
+      list.push({
+        key: 'dayId',
+        label: isAr ? 'اليوم' : 'Day',
+        value: d ? d.name : filters.dayId,
+      });
+    }
+
+    if (filters.cityId) {
+      const c = cities.find((item) => String(item.id) === String(filters.cityId));
+      list.push({
+        key: 'cityId',
+        label: isAr ? 'المدينة' : 'City',
+        value: c ? c.name : filters.cityId,
+      });
+    }
+
+    if (filters.groupType) {
+      const labels: Record<string, string> = {
+        in_person: isAr ? 'حضوري' : 'In-Person',
+        online: isAr ? 'أونلاين' : 'Online',
+        hybrid: isAr ? 'مختلط' : 'Hybrid',
+      };
+      list.push({
+        key: 'groupType',
+        label: isAr ? 'النوع' : 'Type',
+        value: labels[filters.groupType] || filters.groupType,
+      });
+    }
+
+    if (filters.lang) {
+      const labels: Record<string, string> = {
+        arabic: isAr ? 'عربي' : 'Arabic',
+        english: isAr ? 'إنجليزي' : 'English',
+        both: isAr ? 'عربي / إنجليزي' : 'Bilingual',
+      };
+      list.push({
+        key: 'lang',
+        label: isAr ? 'اللغة' : 'Lang',
+        value: labels[filters.lang] || filters.lang,
+      });
+    }
+
+    if (filters.type) {
+      const labels: Record<string, string> = {
+        open: isAr ? 'مفتوح' : 'Open',
+        closed: isAr ? 'مغلق' : 'Closed',
+      };
+      list.push({
+        key: 'type',
+        label: isAr ? 'الصفة' : 'Access',
+        value: labels[filters.type] || filters.type,
+      });
+    }
+
+    return list;
+  }, [filters, days, cities, isAr]);
+
+  const handleRemoveFilter = (key: string) => {
+    setFilters((prev) => ({ ...prev, [key]: null }));
+  };
+
+  const handleClearAllFilters = () => {
+    setFilters({
+      cityId: null,
+      dayId: null,
+      groupType: null,
+      lang: null,
+      type: null,
+    });
+  };
+
+  const renderMeetingItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => (
+      <MeetingCard
+        meetingId={item.id}
+        groupName={item.groupName}
+        cityName={item.cityName}
+        neighborhoodName={item.neighborhoodName}
+        dayName={item.dayName}
+        startTime={item.startTime}
+        endTime={item.endTime}
+        type={item.type}
+        lang={item.lang}
+        notes={item.notes}
+        isBookmarked={!!bookmarks[item.id]}
+        onToggleBookmark={toggleBookmark}
+        index={index}
+      />
+    ),
+    [bookmarks, toggleBookmark]
+  );
 
   return (
-    <View style={styles.screenWrapper}>
-      <SafeAreaView style={styles.safeHeader} edges={['top']}>
+    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
+      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
         {/* Brand Header */}
         <View style={styles.brandHeader}>
           <View style={styles.brandLeft}>
-            <NALogo size={42} />
+            <NALogo size={40} />
             <View style={styles.brandTitleContainer}>
-              <Text style={styles.brandTitleAr}>زمالة المدمنين المجهولين في مصر</Text>
-              <Text style={styles.brandTitleEn}>Narcotics Anonymous • Egypt</Text>
+              <AppText variant="h3" color="#ffffff" weight="800" style={styles.brandTitleAr}>
+                زمالة المدمنين المجهولين
+              </AppText>
+              <AppText variant="caption" color="rgba(224, 248, 252, 0.8)" style={styles.brandTitleEn}>
+                Narcotics Anonymous • Egypt
+              </AppText>
             </View>
           </View>
 
-          {/* Language Toggle */}
-          <TouchableOpacity style={styles.langToggleBtn} onPress={toggleLanguage} activeOpacity={0.8}>
-            <Languages size={14} color="#ffffff" style={{ marginEnd: 4 }} />
-            <Text style={styles.langToggleText}>{isAr ? 'EN' : 'عربي'}</Text>
-          </TouchableOpacity>
+          <LanguageSwitcher />
         </View>
 
-        {/* Search & Filter Controls */}
+        {/* Search Bar & Filter Trigger */}
         <View style={styles.searchSection}>
-          <View style={styles.searchInputContainer}>
-            <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchInput, { textAlign: isAr ? 'right' : 'left' }]}
-              placeholder={t('meetings.search_placeholder')}
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
-            onPress={() => setIsFilterVisible(true)}
-            activeOpacity={0.85}
-          >
-            <SlidersHorizontal size={19} color="#ffffff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.refreshIconButton} onPress={handleRefresh} activeOpacity={0.85}>
-            <RefreshCw size={17} color="#ffffff" />
-          </TouchableOpacity>
+          <SearchBar
+            query={searchQuery}
+            onChangeQuery={setSearchQuery}
+            placeholder={t('meetings.search_placeholder')}
+            onFilterPress={() => setIsFilterVisible(true)}
+            activeFilterCount={activeFilterItems.length}
+            recentSearches={recentSearches}
+            onSelectRecentSearch={(term) => {
+              setSearchQuery(term);
+              addRecentSearch(term);
+            }}
+            onClearRecentSearches={clearRecentSearches}
+          />
         </View>
+
+        {/* Active Filter Chips */}
+        {activeFilterItems.length > 0 && (
+          <FilterChips
+            items={activeFilterItems}
+            onRemoveItem={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+            style={styles.filterChipsRow}
+          />
+        )}
       </SafeAreaView>
 
-      {/* Main Content Area */}
-      <View style={styles.contentBody}>
-        {/* Results Counter */}
+      {/* Content Body */}
+      <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
+        {/* Results Header */}
         <View style={styles.resultsHeaderRow}>
-          <Text style={styles.resultsCountText}>
+          <AppText variant="label" color={colors.primary} weight="700">
             {isAr ? `${filteredMeetings.length} اجتماع متاح` : `${filteredMeetings.length} meetings found`}
-          </Text>
-          {hasActiveFilters && (
-            <TouchableOpacity
-              style={styles.clearFiltersBtn}
-              onPress={() =>
-                setFilters({ cityId: null, dayId: null, groupType: null, lang: null, type: null })
-              }
+          </AppText>
+          {activeFilterItems.length > 0 && (
+            <AppText
+              variant="labelSmall"
+              color={colors.accentDark}
+              weight="700"
+              onPress={handleClearAllFilters}
+              style={{ paddingVertical: 2, paddingHorizontal: 6 }}
             >
-              <Text style={styles.clearFiltersText}>{isAr ? 'إلغاء التصفية' : 'Clear Filters'}</Text>
-            </TouchableOpacity>
+              {isAr ? 'إلغاء كل التصفية' : 'Clear Filters'}
+            </AppText>
           )}
         </View>
 
+        {/* List / Loading / Empty State */}
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>
-              {isAr ? 'جاري تحميل الاجتماعات من قاعدة البيانات...' : 'Loading meetings...'}
-            </Text>
+          <View style={{ paddingTop: 8 }}>
+            <MeetingCardSkeleton />
+            <MeetingCardSkeleton />
+            <MeetingCardSkeleton />
           </View>
         ) : (
           <FlatList
             data={filteredMeetings}
             keyExtractor={(item) => item.id || item.remoteId}
             contentContainerStyle={styles.listContainer}
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === 'android'}
             refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
-            }
-            renderItem={({ item }) => (
-              <MeetingCard
-                meetingId={item.id}
-                groupName={item.groupName}
-                cityName={item.cityName}
-                neighborhoodName={item.neighborhoodName}
-                dayName={item.dayName}
-                startTime={item.startTime}
-                endTime={item.endTime}
-                type={item.type}
-                lang={item.lang}
-                notes={item.notes}
-                isBookmarked={!!bookmarks[item.id]}
-                onToggleBookmark={toggleBookmark}
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.accent, colors.primary]}
+                tintColor={colors.accent}
               />
-            )}
+            }
+            renderItem={renderMeetingItem}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <MapPinOff size={48} color={colors.textMuted} />
-                <Text style={styles.emptyText}>{t('meetings.no_results')}</Text>
-              </View>
+              <EmptyState
+                icon={<MapPinOff size={44} color={colors.accent} />}
+                title={t('meetings.no_results')}
+                description={
+                  activeFilterItems.length > 0
+                    ? isAr
+                      ? 'لا توجد اجتماعات تطابق الفلاتر المحددة. جرب إزالة بعض الفلاتر أو تغيير كلمة البحث.'
+                      : 'No meetings match your selected filters. Try removing some filters or changing search keywords.'
+                    : isAr
+                    ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
+                    : 'No meetings found matching your search.'
+                }
+                primaryActionTitle={activeFilterItems.length > 0 ? (isAr ? 'إلغاء الفلاتر' : 'Clear Filters') : undefined}
+                onPrimaryAction={activeFilterItems.length > 0 ? handleClearAllFilters : undefined}
+                secondaryActionTitle={searchQuery ? (isAr ? 'مسح البحث' : 'Clear Search') : undefined}
+                onSecondaryAction={searchQuery ? () => setSearchQuery('') : undefined}
+              />
             }
           />
         )}
       </View>
 
+      {/* Filter Bottom Sheet */}
       <FilterModal
         visible={isFilterVisible}
         onClose={() => setIsFilterVisible(false)}
@@ -314,19 +432,17 @@ export default function MeetingFinderScreen() {
 const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
-    backgroundColor: '#11253e',
   },
   safeHeader: {
-    backgroundColor: '#11253e',
+    paddingBottom: 4,
   },
   brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#11253e',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   brandLeft: {
     flexDirection: 'row',
@@ -334,149 +450,39 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandTitleContainer: {
-    marginStart: spacing.sm + 2,
+    marginStart: 10,
   },
   brandTitleAr: {
-    ...typography.h3,
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
   },
   brandTitleEn: {
-    ...typography.caption,
-    color: 'rgba(224, 248, 252, 0.8)',
     fontSize: 10,
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  langToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  langToggleText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 12,
-  },
   searchSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    backgroundColor: '#11253e',
-    gap: spacing.sm,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm + 2,
-    height: 44,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  searchIcon: {
-    marginEnd: spacing.xs,
-  },
-  searchInput: {
-    flex: 1,
-    ...typography.body,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  filterIconButton: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  filterIconButtonActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  refreshIconButton: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+  filterChipsRow: {
+    paddingBottom: 4,
   },
   contentBody: {
     flex: 1,
-    backgroundColor: colors.bgLight,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     overflow: 'hidden',
   },
   resultsHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md + 2,
-    paddingBottom: spacing.xs,
-  },
-  resultsCountText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.primary,
-    fontSize: 13,
-  },
-  clearFiltersBtn: {
-    paddingVertical: 3,
-    paddingHorizontal: spacing.sm + 2,
-    backgroundColor: colors.accentLight,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 179, 207, 0.2)',
-  },
-  clearFiltersText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.accentDark,
-    fontSize: 11,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.md,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
   listContainer: {
-    padding: spacing.md,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    marginTop: spacing.xl,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.md,
+    padding: 16,
+    paddingTop: 6,
   },
 });

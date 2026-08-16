@@ -1,10 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  Platform,
+  Share,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Clock, Bookmark, Navigation, Globe } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../theme';
+import { MapPin, Clock, Bookmark, Navigation, Globe, Share2 } from 'lucide-react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import { useAppTheme } from '../theme';
+import { AppText, Badge } from './ui';
+import { haptic } from '../utils/haptics';
 
-interface MeetingCardProps {
+export interface MeetingCardProps {
   meetingId: string;
   groupName: string;
   cityName: string;
@@ -17,9 +27,10 @@ interface MeetingCardProps {
   notes?: string;
   isBookmarked: boolean;
   onToggleBookmark: (id: string) => void;
+  index?: number;
 }
 
-export const MeetingCard: React.FC<MeetingCardProps> = ({
+const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   meetingId,
   groupName,
   cityName,
@@ -32,11 +43,14 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
   notes,
   isBookmarked,
   onToggleBookmark,
+  index = 0,
 }) => {
+  const { colors, spacing, borderRadius, shadows } = useAppTheme();
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
 
   const handleOpenMap = () => {
+    haptic.selection();
     const query = encodeURIComponent(`${groupName}, ${neighborhoodName}, ${cityName}, Egypt`);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
@@ -49,229 +63,248 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
     }
   };
 
+  const handleShare = async () => {
+    haptic.light();
+    try {
+      const message = `${groupName}\n📍 ${cityName}${neighborhoodName ? ` • ${neighborhoodName}` : ''}\n📅 ${dayName} (${startTime} - ${endTime})\n🌐 NA Egypt Fellowship`;
+      await Share.share({
+        message,
+        title: groupName,
+      });
+    } catch {}
+  };
+
+  const handleBookmarkPress = () => {
+    haptic.light();
+    onToggleBookmark(meetingId);
+  };
+
   const getLanguageLabel = () => {
     if (lang === 'arabic' || lang === 'ar') return isAr ? 'عربي' : 'Arabic';
     if (lang === 'english' || lang === 'en') return isAr ? 'إنجليزي' : 'English';
     return isAr ? 'عربي / إنجليزي' : 'Bilingual';
   };
 
+  const isOpen = type === 'open';
+
   return (
-    <View style={[styles.card, shadows.card]}>
-      {/* Top badges & Bookmark */}
+    <Animated.View
+      entering={FadeInUp.delay(Math.min(index * 40, 300)).duration(350)}
+      style={[
+        styles.card,
+        shadows.card,
+        {
+          backgroundColor: colors.cardBg,
+          borderColor: colors.cardBorder,
+          borderRadius: borderRadius.card,
+        },
+      ]}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={`${groupName}, ${dayName} from ${startTime} to ${endTime}, in ${cityName} ${neighborhoodName}. ${isOpen ? 'Open meeting' : 'Closed meeting'}.`}
+    >
+      {/* Top badges & Quick Actions */}
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
-          <View style={[styles.badge, type === 'open' ? styles.openBadge : styles.closedBadge]}>
-            <Text style={[styles.badgeText, type === 'open' ? styles.openBadgeText : styles.closedBadgeText]}>
-              {type === 'open' ? t('meetings.type_open') : t('meetings.type_closed')}
-            </Text>
-          </View>
-          <View style={styles.langBadge}>
-            <Globe size={12} color={colors.primary} style={{ marginEnd: 4 }} />
-            <Text style={styles.langBadgeText}>{getLanguageLabel()}</Text>
-          </View>
+          <Badge
+            label={isOpen ? t('meetings.type_open') : t('meetings.type_closed')}
+            variant={isOpen ? 'accent' : 'neutral'}
+            size="sm"
+          />
+          <Badge
+            label={getLanguageLabel()}
+            variant="primary"
+            size="sm"
+            icon={<Globe size={11} color={colors.primary} />}
+          />
         </View>
 
-        <TouchableOpacity
-          onPress={() => onToggleBookmark(meetingId)}
-          hitSlop={12}
-          style={styles.bookmarkBtn}
-        >
-          <Bookmark
-            size={22}
-            color={isBookmarked ? colors.gold : colors.textMuted}
-            fill={isBookmarked ? colors.gold : 'transparent'}
-          />
-        </TouchableOpacity>
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity
+            onPress={handleShare}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel={isAr ? 'مشاركة تفاصيل الاجتماع' : 'Share meeting details'}
+          >
+            <Share2 size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleBookmarkPress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[styles.iconButton, { backgroundColor: isBookmarked ? colors.goldLight : colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark meeting'}
+          >
+            <Bookmark
+              size={17}
+              color={isBookmarked ? colors.goldDark : colors.textMuted}
+              fill={isBookmarked ? colors.goldDark : 'transparent'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Group Title */}
-      <Text style={[styles.groupTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+      <AppText
+        variant="h3"
+        color={colors.textPrimary}
+        weight="700"
+        style={styles.groupTitle}
+      >
         {groupName}
-      </Text>
+      </AppText>
 
       {/* Location Row */}
       <View style={styles.infoRow}>
-        <View style={styles.iconWrapper}>
-          <MapPin size={15} color={colors.accent} />
+        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+          <MapPin size={14} color={colors.accentDark} />
         </View>
-        <Text style={[styles.infoText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+        <AppText
+          variant="body"
+          color={colors.textSecondary}
+          weight="500"
+          style={styles.infoText}
+        >
           {cityName}{neighborhoodName ? ` • ${neighborhoodName}` : ''}
-        </Text>
+        </AppText>
       </View>
 
-      {/* Time & Day Row with strict LTR time range */}
+      {/* Time & Day Row */}
       <View style={styles.infoRow}>
-        <View style={styles.iconWrapper}>
-          <Clock size={15} color={colors.accent} />
+        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+          <Clock size={14} color={colors.accentDark} />
         </View>
         <View style={styles.timeContainer}>
-          <Text style={[styles.dayHighlight, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+          <AppText
+            variant="body"
+            color={colors.primary}
+            weight="700"
+            style={styles.dayHighlight}
+          >
             {dayName}
-          </Text>
-          <Text style={styles.timeDivider}> | </Text>
-          <Text style={styles.timeLtrText}>
+          </AppText>
+          <AppText variant="body" color={colors.textMuted} style={styles.timeDivider}> | </AppText>
+          <AppText
+            variant="body"
+            color={colors.textPrimary}
+            weight="600"
+            style={styles.timeLtrText}
+          >
             {`\u200E${startTime} \u2013 ${endTime}`}
-          </Text>
+          </AppText>
         </View>
       </View>
 
       {/* Optional Notes */}
       {notes ? (
-        <View style={styles.notesContainer}>
-          <Text style={[styles.notesText, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}>
+        <View style={[styles.notesContainer, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid }]}>
+          <AppText variant="bodySmall" color={colors.textSecondary} style={styles.notesText}>
             {notes}
-          </Text>
+          </AppText>
         </View>
       ) : null}
 
       {/* Map Directions Button */}
       <TouchableOpacity
-        style={styles.mapButton}
+        style={[styles.mapButton, { backgroundColor: colors.primary }]}
         onPress={handleOpenMap}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={t('meetings.directions')}
       >
         <Navigation size={15} color={colors.white} style={{ marginEnd: spacing.xs + 2 }} />
-        <Text style={styles.mapButtonText}>{t('meetings.directions')}</Text>
+        <AppText variant="label" color={colors.white} weight="700">
+          {t('meetings.directions')}
+        </AppText>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
+export const MeetingCard = React.memo(MeetingCardComponent);
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: borderRadius.card,
-    padding: spacing.md + 2,
-    marginBottom: spacing.md,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(30, 58, 95, 0.08)',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: 10,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: 6,
   },
-  badge: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-  },
-  openBadge: {
-    backgroundColor: '#e0f8fc',
-  },
-  closedBadge: {
-    backgroundColor: '#fef3c7',
-  },
-  badgeText: {
-    ...typography.caption,
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  openBadgeText: {
-    color: '#08899f',
-  },
-  closedBadgeText: {
-    color: '#d97706',
-  },
-  langBadge: {
+  actionButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 58, 95, 0.06)',
+    gap: 8,
   },
-  langBadgeText: {
-    ...typography.caption,
-    fontWeight: '600',
-    fontSize: 11,
-    color: colors.primary,
-  },
-  bookmarkBtn: {
-    padding: 2,
+  iconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   groupTitle: {
-    ...typography.h2,
-    fontSize: 17,
-    color: colors.primary,
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
+    marginBottom: 10,
+    lineHeight: 22,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xs + 2,
+    marginBottom: 8,
   },
   iconWrapper: {
-    width: 28,
-    height: 28,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(16, 179, 207, 0.08)',
-    justifyContent: 'center',
+    width: 26,
+    height: 26,
+    borderRadius: 6,
     alignItems: 'center',
-    marginEnd: spacing.sm,
+    justifyContent: 'center',
+    marginEnd: 8,
   },
   infoText: {
-    ...typography.body,
-    color: colors.textSecondary,
     flex: 1,
   },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    flex: 1,
   },
   dayHighlight: {
     fontWeight: '700',
-    color: colors.primary,
-    fontSize: 14,
   },
   timeDivider: {
-    color: colors.textMuted,
-    fontSize: 14,
+    marginHorizontal: 4,
   },
   timeLtrText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    writingDirection: 'ltr',
-    textAlign: 'left',
+    fontVariant: ['tabular-nums'],
   },
   notesContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: borderRadius.sm,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.accent,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 8,
   },
   notesText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    lineHeight: 18,
   },
   mapButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 3,
-    marginTop: spacing.md,
-  },
-  mapButtonText: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: '700',
-    fontSize: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+    minHeight: 44,
   },
 });
-

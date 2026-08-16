@@ -8,12 +8,13 @@ import { seedInitialLocalData, pullMasterData } from '../src/database/sync';
 import { startOutboxNetworkListener } from '../src/database/outboxWorker';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { BrandedSplashScreen } from '../src/components/BrandedSplashScreen';
-import { colors } from '../src/theme';
+import { useAppTheme } from '../src/theme';
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
+  const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
     // Seed initial local database tables & pull live data
@@ -35,14 +36,14 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={isDark ? 'light' : 'light'} />
         <OfflineBanner />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.primary },
             headerTintColor: '#ffffff',
             headerTitleStyle: { fontWeight: '700' },
-            contentStyle: { backgroundColor: colors.bgLight },
+            contentStyle: { backgroundColor: colors.bgPrimary },
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -60,4 +61,3 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
-
