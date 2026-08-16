@@ -10,6 +10,13 @@
     "agendas": "الأجندات والتقارير",
     "contact": "اتصل بنا"
   },
+  "home": {
+    "jft_button": "لليوم فقط",
+    "helpline_button": "خطوط المساعدة",
+    "stats_weekly": "اجتماع أسبوعياً",
+    "stats_groups": "مجموعة",
+    "stats_governorates": "محافظة"
+  },
   "meetings": {
     "search_placeholder": "ابحث باسم المجموعة، الحي، أو المدينة...",
     "filter_button": "تصفية الاجتماعات",

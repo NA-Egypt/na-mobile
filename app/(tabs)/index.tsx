@@ -8,13 +8,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { MapPinOff } from 'lucide-react-native';
+import { MapPinOff, Sparkles, PhoneCall } from 'lucide-react-native';
 import { database } from '../../src/database';
 import Meeting from '../../src/database/models/Meeting';
 import City from '../../src/database/models/City';
 import Day from '../../src/database/models/Day';
 import { MeetingCard } from '../../src/components/MeetingCard';
 import { FilterModal, FilterOptions } from '../../src/components/FilterModal';
+import { JftModal } from '../../src/components/JftModal';
+import { HelplineModal } from '../../src/components/HelplineModal';
 import { NALogo } from '../../src/components/NALogo';
 import {
   AppText,
@@ -27,9 +29,12 @@ import {
 } from '../../src/components/ui';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { pullMasterData } from '../../src/database/sync';
+import { homeApi } from '../../src/api/home';
+import { FrontpageStats } from '../../src/api/types';
 import { useAppTheme } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
 import { haptic } from '../../src/utils/haptics';
+import { TouchableOpacity } from 'react-native';
 
 export default function MeetingFinderScreen() {
   const { t, i18n } = useTranslation();
@@ -40,6 +45,10 @@ export default function MeetingFinderScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isJftVisible, setIsJftVisible] = useState(false);
+  const [isHelplineVisible, setIsHelplineVisible] = useState(false);
+  const [frontpageStats, setFrontpageStats] = useState<FrontpageStats | null>(null);
+
 
   const {
     recentSearches,
@@ -141,6 +150,11 @@ export default function MeetingFinderScreen() {
       loadDataFromLocalDB();
     });
 
+    homeApi
+      .getStats()
+      .then((st) => setFrontpageStats(st))
+      .catch(() => {});
+
     const subscription = database
       .get<Meeting>('meetings')
       .query()
@@ -155,10 +169,14 @@ export default function MeetingFinderScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await pullMasterData();
+    await Promise.allSettled([
+      pullMasterData(),
+      homeApi.getStats().then((st) => setFrontpageStats(st)),
+    ]);
     await loadDataFromLocalDB();
     setIsRefreshing(false);
   };
+
 
   const handleSearchSubmit = (text: string) => {
     setSearchQuery(text);
@@ -328,6 +346,41 @@ export default function MeetingFinderScreen() {
           </View>
         </View>
 
+        {/* Quick Access Actions Bar: Just For Today Reading & Emergency Helplines */}
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}
+            onPress={() => {
+              haptic.selection();
+              setIsJftVisible(true);
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Just For Today"
+          >
+            <Sparkles size={14} color={colors.accent} style={{ marginEnd: 6 }} />
+            <AppText variant="labelSmall" color="#ffffff" weight="700">
+              {isAr ? 'لليوم فقط' : 'Just For Today'}
+            </AppText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}
+            onPress={() => {
+              haptic.selection();
+              setIsHelplineVisible(true);
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Helplines"
+          >
+            <PhoneCall size={13} color={colors.accent} style={{ marginEnd: 6 }} />
+            <AppText variant="labelSmall" color="#ffffff" weight="700">
+              {isAr ? 'خطوط المساعدة' : 'Helplines'}
+            </AppText>
+          </TouchableOpacity>
+        </View>
+
         {/* Search Bar & Filter Trigger */}
         <View style={styles.searchSection}>
           <SearchBar
@@ -361,7 +414,13 @@ export default function MeetingFinderScreen() {
         {/* Results Header */}
         <View style={styles.resultsHeaderRow}>
           <AppText variant="label" color={colors.primary} weight="700">
-            {isAr ? `${filteredMeetings.length} اجتماع متاح` : `${filteredMeetings.length} meetings found`}
+            {isAr
+              ? `${filteredMeetings.length} اجتماع متاح${
+                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
+                }`
+              : `${filteredMeetings.length} meetings found${
+                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
+                }`}
           </AppText>
           {activeFilterItems.length > 0 && (
             <AppText
@@ -433,6 +492,18 @@ export default function MeetingFinderScreen() {
         cities={cities}
         days={days}
       />
+
+      {/* Daily Spiritual Reflection Modal (Just For Today) */}
+      <JftModal
+        visible={isJftVisible}
+        onClose={() => setIsJftVisible(false)}
+      />
+
+      {/* Regional Helplines & Official Social Channels Modal */}
+      <HelplineModal
+        visible={isHelplineVisible}
+        onClose={() => setIsHelplineVisible(false)}
+      />
     </View>
   );
 }
@@ -450,7 +521,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 8,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 10,
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -499,3 +586,4 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 });
+

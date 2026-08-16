@@ -77,6 +77,69 @@ Mobile apps authenticate the user via Azure Active Directory / Microsoft Identit
 
 ---
 
+### 3.0 Frontpage & Content Endpoints
+
+#### `GET /api/v1/home` (Alias: `GET /api/v1/frontpage`)
+Fetches all aggregated frontpage data in one consolidated response (stats, daily reading, helplines, official social links, and upcoming events).
+- **Access:** Public
+- **Query Parameters:**
+  - `date` *(optional)*: `YYYY-MM-DD`
+- **Response (200 OK):**
+  ```json
+  {
+    "data": {
+      "stats": {
+        "weekly_meetings": 142,
+        "total_meetings": 160,
+        "in_person_groups": 45,
+        "online_groups": 12,
+        "groups": 45,
+        "total_groups": 57,
+        "governorates": 14,
+        "cities": 14,
+        "upcoming_events": 3
+      },
+      "jft": {
+        "date": "2026-08-17",
+        "page_date": "17 أغسطس",
+        "title": "الامتنان اليومي",
+        "quote": "أنا ممتن جداً...",
+        "quote_source": "النص الأساسي - ص.42",
+        "content": ["الفقرة الأولى..."],
+        "thought_for_the_day": "لليوم فقط: سأحافظ على صلتي الواعية بقوتي العظمى.",
+        "content_html": "<p>...</p>"
+      },
+      "helplines": [
+        {
+          "region": "Cairo & Giza",
+          "region_ar": "القاهرة والجيزة",
+          "phones": ["+201006979198", "+201060933888"],
+          "whatsapp": "https://wa.me/201060933888"
+        }
+      ],
+      "social_links": {
+        "facebook": "https://www.facebook.com/OfficialNAEgyPage",
+        "instagram": "https://www.instagram.com/narcoticsanonymousegy",
+        "tiktok": "https://www.tiktok.com/@narcoticsanonymousegypt",
+        "whatsapp": "https://wa.me/201060933888",
+        "email": "pr@naegypt.org"
+      },
+      "upcoming_events": []
+    }
+  }
+  ```
+
+#### `GET /api/v1/jft`
+Retrieves daily spiritual reflection (Just For Today) with structured parsed fields and clean HTML.
+- **Access:** Public
+- **Query Parameters:** `date` (`YYYY-MM-DD`, defaults to today)
+
+#### `GET /api/v1/stats`
+Retrieves platform statistics counter (weekly meetings, groups, governorates, events).
+- **Access:** Public
+
+---
+
 ### 3.1 Meetings (`/api/v1/meetings`)
 
 #### `GET /api/v1/meetings`
@@ -424,6 +487,23 @@ export class NaEgyptApiClient {
     });
     this.setToken(res.token);
     return res;
+  }
+
+  // Fetch Frontpage Consolidated Data
+  public async getHomeData(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : "";
+    return this.request<ApiResponse<any>>(`/home${query}`);
+  }
+
+  // Fetch Just For Today Daily Reading
+  public async getJft(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : "";
+    return this.request<ApiResponse<any>>(`/jft${query}`);
+  }
+
+  // Fetch Public Stats
+  public async getStats() {
+    return this.request<ApiResponse<any>>("/stats");
   }
 
   // Fetch Meetings

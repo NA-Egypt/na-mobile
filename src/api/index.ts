@@ -1,6 +1,7 @@
 export * from './client';
 export * from './types';
 export * from './auth';
+export * from './home';
 export * from './meetings';
 export * from './groups';
 export * from './events';
@@ -10,3 +11,4 @@ export * from './lookups';
 export * from './contact';
 export * from './transactions';
 export * from './newsletter';
+export * from './users';

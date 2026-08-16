@@ -380,3 +380,119 @@ export interface Permission {
   name: string;
   guard_name?: string;
 }
+
+// User Management Payloads
+export interface UserQueryFilters {
+  page?: number;
+  per_page?: number;
+  role?: string;
+  service_body_id?: number;
+  search?: string;
+}
+
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  password?: string;
+  service_body_id?: number;
+  roles?: string[] | number[];
+}
+
+export interface UpdateUserPayload extends Partial<CreateUserPayload> {}
+
+// Frontpage & Content Interfaces (Section 3.0)
+export interface FrontpageStats {
+  weekly_meetings?: number;
+  total_meetings?: number;
+  in_person_groups?: number;
+  online_groups?: number;
+  groups?: number;
+  total_groups?: number;
+  governorates?: number;
+  cities?: number;
+  upcoming_events?: number;
+}
+
+export interface JftData {
+  date?: string;
+  page_date?: string;
+  title?: string;
+  quote?: string;
+  quote_source?: string;
+  content?: string[];
+  thought_for_the_day?: string;
+  content_html?: string;
+}
+
+export interface HelplineItem {
+  region: string;
+  region_ar: string;
+  phones: string[];
+  whatsapp?: string;
+}
+
+export interface SocialLinks {
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  email?: string;
+}
+
+export interface FrontpageData {
+  stats: FrontpageStats;
+  jft: JftData;
+  helplines: HelplineItem[];
+  social_links: SocialLinks;
+  upcoming_events: CalendarEvent[] | any[];
+}
+
+// Lookup Management Payloads
+export interface CreateCityPayload {
+  ar_name: string;
+  en_name: string;
+  code?: string;
+}
+
+export interface CreateNeighborhoodPayload {
+  city_id: number;
+  ar_name: string;
+  en_name: string;
+}
+
+export interface CreateTopicPayload {
+  ar_name: string;
+  en_name: string;
+  code?: string;
+}
+
+export interface CreateOptionPayload {
+  ar_name: string;
+  en_name: string;
+  code?: string;
+}
+
+export interface CreateServiceBodyPayload {
+  ar_name: string;
+  en_name: string;
+  email?: string;
+  phone?: string;
+  area_name?: string;
+}
+
+export interface CreateServiceCommitteePayload {
+  service_body_id: number;
+  ar_name: string;
+  en_name: string;
+  description?: string;
+}
+
+export interface CreateScMeetingPayload {
+  service_committee_id: number;
+  day_id: number;
+  start_time: string;
+  end_time: string;
+  location?: string;
+  notes?: string;
+}
+

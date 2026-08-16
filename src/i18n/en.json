@@ -10,6 +10,13 @@
     "agendas": "Agendas & Reports",
     "contact": "Contact Us"
   },
+  "home": {
+    "jft_button": "Just For Today",
+    "helpline_button": "Helplines",
+    "stats_weekly": "Meetings/Week",
+    "stats_groups": "Groups",
+    "stats_governorates": "Governorates"
+  },
   "meetings": {
     "search_placeholder": "Search group name, neighborhood, city...",
     "filter_button": "Filter Meetings",
