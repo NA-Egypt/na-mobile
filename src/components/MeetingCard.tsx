@@ -25,6 +25,7 @@ export interface MeetingCardProps {
   type: 'open' | 'closed' | string;
   lang: 'ar' | 'en' | 'both' | 'arabic' | 'english' | string;
   notes?: string;
+  locationUrl?: string;
   isBookmarked: boolean;
   onToggleBookmark: (id: string) => void;
   index?: number;
@@ -41,6 +42,7 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   type,
   lang,
   notes,
+  locationUrl,
   isBookmarked,
   onToggleBookmark,
   index = 0,
@@ -51,6 +53,20 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
   const handleOpenMap = () => {
     haptic.selection();
+    if (
+      locationUrl &&
+      (locationUrl.startsWith('http://') ||
+        locationUrl.startsWith('https://') ||
+        locationUrl.startsWith('geo:') ||
+        locationUrl.startsWith('maps:'))
+    ) {
+      Linking.openURL(locationUrl).catch(() => {
+        const query = encodeURIComponent(`${groupName}, ${neighborhoodName}, ${cityName}, Egypt`);
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+      });
+      return;
+    }
+
     const query = encodeURIComponent(`${groupName}, ${neighborhoodName}, ${cityName}, Egypt`);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
@@ -106,6 +122,11 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
       {/* Top badges & Quick Actions */}
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
+          <Badge
+            label={dayName}
+            variant="gold"
+            size="sm"
+          />
           <Badge
             label={isOpen ? t('meetings.type_open') : t('meetings.type_closed')}
             variant={isOpen ? 'accent' : 'neutral'}
@@ -171,21 +192,12 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
         </AppText>
       </View>
 
-      {/* Time & Day Row */}
+      {/* Time Row */}
       <View style={styles.infoRow}>
         <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
           <Clock size={14} color={colors.accentDark} />
         </View>
         <View style={styles.timeContainer}>
-          <AppText
-            variant="body"
-            color={colors.primary}
-            weight="700"
-            style={styles.dayHighlight}
-          >
-            {dayName}
-          </AppText>
-          <AppText variant="body" color={colors.textMuted} style={styles.timeDivider}> | </AppText>
           <AppText
             variant="body"
             color={colors.textPrimary}

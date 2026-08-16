@@ -162,10 +162,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             showsVerticalScrollIndicator={false}
           >
             {/* 1. Day of Week */}
-            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+            >
               {isAr ? 'يوم الاجتماع' : 'Day of Week'}
             </AppText>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 style={[
                   styles.chip,
@@ -219,10 +224,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
 
             {/* 2. City */}
-            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+            >
               {isAr ? 'المدينة / المحافظة' : 'City / Governorate'}
             </AppText>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 style={[
                   styles.chip,
@@ -276,10 +286,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
 
             {/* 3. Meeting Type */}
-            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+            >
               {isAr ? 'نوع الحضور' : 'Attendance Type'}
             </AppText>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
               {[
                 { id: null, label: isAr ? 'الكل' : 'All' },
                 { id: 'in_person', label: isAr ? 'حضوري' : 'In-Person' },
@@ -316,10 +331,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
 
             {/* 4. Language */}
-            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+            >
               {isAr ? 'لغة الاجتماع' : 'Meeting Language'}
             </AppText>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
               {[
                 { id: null, label: isAr ? 'كل اللغات' : 'All Languages' },
                 { id: 'arabic', label: isAr ? 'عربي' : 'Arabic' },
@@ -356,10 +376,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
 
             {/* 5. Access Type (Open/Closed) */}
-            <AppText variant="h4" color={colors.textPrimary} weight="700" style={styles.sectionTitle}>
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+            >
               {isAr ? 'طبيعة الحضور' : 'Access Policy'}
             </AppText>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
               {[
                 { id: null, label: isAr ? 'الكل' : 'All' },
                 { id: 'open', label: isAr ? 'مفتوح (للجميع)' : 'Open (All)' },

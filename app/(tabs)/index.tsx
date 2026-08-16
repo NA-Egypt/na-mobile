@@ -118,6 +118,7 @@ export default function MeetingFinderScreen() {
           startTime: m.formattedStartTime || m.startTime || '',
           endTime: m.formattedEndTime || m.endTime || '',
           address: isAr ? m.addressAr || m.addressEn || '' : m.addressEn || m.addressAr || '',
+          locationUrl: m.locationUrl || '',
           type: m.type || 'open',
           lang: m.lang || 'arabic',
           notes: m.notes || '',
@@ -292,6 +293,7 @@ export default function MeetingFinderScreen() {
         type={item.type}
         lang={item.lang}
         notes={item.notes}
+        locationUrl={item.locationUrl}
         isBookmarked={!!bookmarks[item.id]}
         onToggleBookmark={toggleBookmark}
         index={index}

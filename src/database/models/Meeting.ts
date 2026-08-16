@@ -22,6 +22,7 @@ export default class Meeting extends Model {
   @text('group_type') groupType?: string;
   @text('address_ar') addressAr?: string;
   @text('address_en') addressEn?: string;
+  @text('location_url') locationUrl?: string;
   @text('city_name_ar') cityNameAr?: string;
   @text('city_name_en') cityNameEn?: string;
   @text('neighborhood_name_ar') neighborhoodNameAr?: string;

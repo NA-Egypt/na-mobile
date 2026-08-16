@@ -117,6 +117,7 @@ export async function pullMasterData(): Promise<void> {
               m.groupType = item.group_type ?? m.groupType;
               m.addressAr = item.address_ar ?? m.addressAr;
               m.addressEn = item.address_en ?? m.addressEn;
+              m.locationUrl = item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || m.locationUrl;
               m.cityNameAr = item.city_name_ar ?? m.cityNameAr;
               m.cityNameEn = item.city_name_en ?? m.cityNameEn;
               m.neighborhoodNameAr = item.neighborhood_name_ar ?? m.neighborhoodNameAr;
@@ -144,6 +145,7 @@ export async function pullMasterData(): Promise<void> {
               m.groupType = item.group_type || '';
               m.addressAr = item.address_ar || '';
               m.addressEn = item.address_en || '';
+              m.locationUrl = item.location_url || item.map_url || item.google_maps_url || item.location_link || item.address_url || '';
               m.cityNameAr = item.city_name_ar || '';
               m.cityNameEn = item.city_name_en || '';
               m.neighborhoodNameAr = item.neighborhood_name_ar || '';

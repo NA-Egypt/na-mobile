@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 4,
+  version: 5,
   tables: [
     tableSchema({
       name: 'meetings',
@@ -15,6 +15,7 @@ export const schema = appSchema({
         { name: 'group_type', type: 'string', isOptional: true },
         { name: 'address_ar', type: 'string', isOptional: true },
         { name: 'address_en', type: 'string', isOptional: true },
+        { name: 'location_url', type: 'string', isOptional: true },
         { name: 'city_name_ar', type: 'string', isOptional: true, isIndexed: true },
         { name: 'city_name_en', type: 'string', isOptional: true, isIndexed: true },
         { name: 'neighborhood_name_ar', type: 'string', isOptional: true, isIndexed: true },
