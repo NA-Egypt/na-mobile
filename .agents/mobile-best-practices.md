@@ -81,3 +81,19 @@
     : (item.topic || item.topic_name || '');
   ```
 
+## 10. Azure AD / MSAL Authentication & Broker Integration
+- **Platform-Specific Redirect URIs**:
+  - Android broker/browser redirect must follow `msauth://<package_name>/<signature_hash_url_encoded>` (e.g., `msauth://org.naegypt.app/Xo8WBi6jzSxKDVR4drqm84yr9iU%3D`), matching the Android signature hash in Azure App Registration.
+  - iOS redirect must follow `msauth.<bundle_id>://auth` registered under `CFBundleURLSchemes`.
+  - Expo custom scheme fallback: `naegypt://auth-callback`.
+- **PKCE Authorization & Account Chooser**:
+  - When initiating interactive login via `AuthSession.AuthRequest`, specify `prompt: AuthSession.Prompt.SelectAccount` and `domain_hint: 'egyptna.org'` to allow servants to easily switch accounts or pick from cached identities without session lock-in.
+  - Required Scopes: `openid`, `profile`, `email`, `offline_access`, `User.Read`.
+- **Hybrid Token Exchange & Fallback**:
+  - Direct exchange: Exchange authorization code for Azure access token using `AuthSession.exchangeCodeAsync` with `code_verifier`, then exchange Azure token with backend `POST /api/v1/auth/azure/login`.
+  - Server redirect fallback: If client PKCE is restricted, fall back to `WebBrowser.openAuthSessionAsync('https://egyptna.org/auth/azure/redirect?redirect_uri=naegypt://auth-callback', 'naegypt://auth-callback')`.
+- **Silent Auth & Two-Stage Sign-Out**:
+  - App startup runs silent auth checking `SecureStore` for Sanctum token and verifies against `GET /api/v1/user`, auto-clearing tokens on 401 response.
+  - Default logout deletes local Sanctum token and cached user. For a full device sign-out, trigger Azure logout URL `https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/logout?post_logout_redirect_uri=naegypt://auth-callback`.
+
+
