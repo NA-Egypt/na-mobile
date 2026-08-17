@@ -10,15 +10,20 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, ArrowLeft, CheckCircle2, Lock } from 'lucide-react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
+import {
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  Lock,
+  ShieldCheck,
+  Smartphone,
+  RefreshCw,
+} from 'lucide-react-native';
 import { NALogo } from '../src/components/NALogo';
 import { useAppTheme } from '../src/theme';
 import { AppText, Badge, LanguageSwitcher } from '../src/components/ui';
 import { haptic } from '../src/utils/haptics';
-
-WebBrowser.maybeCompleteAuthSession();
+import { azureAuthService } from '../src/services/azureAuthService';
 
 export default function LoginScreen() {
   const { t, i18n } = useTranslation();
@@ -27,59 +32,105 @@ export default function LoginScreen() {
   const { colors, borderRadius, shadows } = useAppTheme();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authStatusMessage, setAuthStatusMessage] = useState<string | null>(null);
 
   const handleMicrosoftLogin = async () => {
     haptic.selection();
     setIsAuthenticating(true);
+    setAuthStatusMessage(
+      isAr
+        ? 'جاري الاتصال بحسابات مايكروسوفت وتطبيق Authenticator...'
+        : 'Connecting to Microsoft & Authenticator Broker...'
+    );
+
     try {
-      const authUrl = 'https://egyptna.org/auth/azure/redirect?redirect_uri=naegypt://auth-callback';
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, 'naegypt://auth-callback');
+      const result = await azureAuthService.loginInteractive();
 
-      if (result.type === 'success' && result.url) {
-        const urlParams = new URLSearchParams(result.url.split('?')[1] || '');
-        const token = urlParams.get('token') || urlParams.get('access_token');
-        const userJson = urlParams.get('user');
-
-        if (token) {
-          await SecureStore.setItemAsync('na_egypt_sanctum_token', token);
-          if (userJson) {
-            await SecureStore.setItemAsync('na_egypt_user_data', decodeURIComponent(userJson));
-          }
-          haptic.success();
-          Alert.alert(
-            isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
-            isAr ? 'تم تسجيل الدخول بنجاح بحساب مايكروسوفت الخادمي.' : 'Signed in successfully with your Microsoft Servant account.'
-          );
-          router.back();
-          return;
-        }
-      }
-
-      if (result.type === 'cancel' || result.type === 'dismiss') {
+      if (result.cancelled) {
+        setAuthStatusMessage(null);
         return;
       }
 
+      if (result.success && result.sanctumToken) {
+        haptic.success();
+        const servantName = result.user?.name || (isAr ? 'خادم معتمد' : 'Trusted Servant');
+        Alert.alert(
+          isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
+          isAr
+            ? `مرحباً بك، ${servantName}. تم تسجيل الدخول بنجاح بحساب مايكروسوفت المؤسسي.`
+            : `Welcome, ${servantName}. Signed in successfully with your Microsoft Servant account.`
+        );
+        router.back();
+        return;
+      }
+
+      // Handle failure
       haptic.warning();
       Alert.alert(
         isAr ? 'تنبيه المصادقة' : 'Authentication Notice',
-        isAr
-          ? 'لم يتم استلام رمز المصادقة من الخادم. يرجى التأكد من تفعيل مسار GET /auth/azure/redirect على الخادم.'
-          : 'Authentication token not received. Please verify the backend GET /auth/azure/redirect route.'
+        result.error ||
+          (isAr
+            ? 'تعذر إتمام عملية الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.'
+            : 'Could not complete Microsoft sign in. Please try again.')
       );
     } catch (error: any) {
       console.warn('OAuth Error:', error);
       haptic.error();
       Alert.alert(
         isAr ? 'خطأ في الاتصال' : 'Connection Error',
-        isAr ? 'تعذر إتمام عملية الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.' : 'Could not complete Microsoft sign in. Please try again.'
+        isAr
+          ? 'تعذر الاتصال بخدمة مايكروسوفت أو خادم NA Egypt. يرجى التأكد من اتصالك بالإنترنت والمحاولة مجدداً.'
+          : 'Could not connect to Microsoft or NA Egypt server. Please verify your internet connection.'
       );
     } finally {
       setIsAuthenticating(false);
+      setAuthStatusMessage(null);
+    }
+  };
+
+  const handleWebFallbackLogin = async () => {
+    haptic.light();
+    setIsAuthenticating(true);
+    setAuthStatusMessage(
+      isAr
+        ? 'جاري فتح بوابة الويب البديلة للدخول...'
+        : 'Opening web authentication portal...'
+    );
+
+    try {
+      const result = await azureAuthService.loginWithBackendRedirect();
+      if (result.cancelled) {
+        return;
+      }
+
+      if (result.success) {
+        haptic.success();
+        Alert.alert(
+          isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
+          isAr
+            ? 'تم تسجيل الدخول بنجاح عبر بوابة الويب.'
+            : 'Signed in successfully via Web portal.'
+        );
+        router.back();
+      } else {
+        Alert.alert(
+          isAr ? 'فشل تسجيل الدخول' : 'Sign In Failed',
+          result.error || (isAr ? 'تعذر إتمام الدخول' : 'Failed to authenticate')
+        );
+      }
+    } catch (e) {
+      Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'حدث خطأ غير متوقع' : 'Unexpected error');
+    } finally {
+      setIsAuthenticating(false);
+      setAuthStatusMessage(null);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.bgPrimary }]}
+      edges={['top', 'bottom']}
+    >
       <View style={styles.topBar}>
         <TouchableOpacity
           onPress={() => {
@@ -90,12 +141,19 @@ export default function LoginScreen() {
           accessibilityRole="button"
           accessibilityLabel={isAr ? 'رجوع' : 'Back'}
         >
-          {isAr ? <ArrowRight size={20} color={colors.textPrimary} /> : <ArrowLeft size={20} color={colors.textPrimary} />}
+          {isAr ? (
+            <ArrowRight size={20} color={colors.textPrimary} />
+          ) : (
+            <ArrowLeft size={20} color={colors.textPrimary} />
+          )}
         </TouchableOpacity>
         <LanguageSwitcher />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Top Branding */}
         <View style={styles.headerArea}>
           <View style={styles.logoBox}>
@@ -110,10 +168,15 @@ export default function LoginScreen() {
             size="md"
             style={{ marginVertical: 8 }}
           />
-          <AppText variant="body" color={colors.textSecondary} align="center" style={styles.subtitle}>
+          <AppText
+            variant="body"
+            color={colors.textSecondary}
+            align="center"
+            style={styles.subtitle}
+          >
             {isAr
-              ? 'تسجيل الدخول الموحد (SSO) للاطلاع على جداول أعمال الهيئات الخدمية، محاضر الاجتماعات والتقارير الإقليمية.'
-              : 'Single Sign-On (SSO) to view Service Body Agendas, Meeting Minutes, and Regional Committee Reports.'}
+              ? 'تسجيل الدخول الموحد (Microsoft SSO) للاطلاع على جداول أعمال الهيئات الخدمية، محاضر الاجتماعات والتقارير الإقليمية.'
+              : 'Single Sign-On (Microsoft SSO) to view Service Body Agendas, Meeting Minutes, and Regional Committee Reports.'}
           </AppText>
         </View>
 
@@ -130,7 +193,7 @@ export default function LoginScreen() {
           ]}
         >
           <View style={styles.lockRow}>
-            <Lock size={16} color={colors.accentDark} style={{ marginEnd: 6 }} />
+            <ShieldCheck size={18} color={colors.accentDark} style={{ marginEnd: 6 }} />
             <AppText variant="h4" color={colors.textPrimary} weight="700">
               {isAr ? 'المصادقة المؤسسية الآمنة' : 'Secure Organizational Auth'}
             </AppText>
@@ -138,15 +201,25 @@ export default function LoginScreen() {
 
           {/* Microsoft Login Button */}
           <TouchableOpacity
-            style={[styles.microsoftButton, { borderRadius: borderRadius.md }]}
+            style={[
+              styles.microsoftButton,
+              { borderRadius: borderRadius.md, opacity: isAuthenticating ? 0.8 : 1 },
+            ]}
             onPress={handleMicrosoftLogin}
             disabled={isAuthenticating}
             activeOpacity={0.88}
             accessibilityRole="button"
-            accessibilityLabel={isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'}
+            accessibilityLabel={
+              isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'
+            }
           >
             {isAuthenticating ? (
-              <ActivityIndicator color="#ffffff" />
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#ffffff" size="small" style={{ marginEnd: 10 }} />
+                <AppText variant="body" color="#ffffff" weight="600" style={styles.msButtonText}>
+                  {isAr ? 'جاري التحقق والمصادقة...' : 'Authenticating...'}
+                </AppText>
+              </View>
             ) : (
               <View style={styles.msButtonContent}>
                 {/* Official 4-Color Microsoft Square */}
@@ -163,27 +236,50 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Guidelines */}
+          {/* Broker Status Helper */}
+          {authStatusMessage ? (
+            <View style={styles.statusBox}>
+              <Smartphone size={14} color={colors.primary} style={{ marginEnd: 6 }} />
+              <AppText variant="caption" color={colors.primary} weight="600" style={{ flex: 1 }}>
+                {authStatusMessage}
+              </AppText>
+            </View>
+          ) : null}
+
+          {/* Guidelines & Features */}
           <View style={[styles.featuresList, { borderTopColor: colors.borderSubtle }]}>
             <View style={styles.featureItem}>
               <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
               <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'الوصول المباشر لأجندات اللجان الفرعية' : 'Direct access to Sub-committee Agendas'}
+                {isAr ? 'دعم Microsoft Authenticator واختيار الحساب المباشر' : 'Microsoft Authenticator & Account Picker support'}
               </AppText>
             </View>
             <View style={styles.featureItem}>
               <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
               <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'قراءة وتحميل التقارير المالية والخدمية' : 'Read & download H&I and Treasury reports'}
+                {isAr ? 'الوصول المباشر لأجندات اللجان وتقارير الهيئات الخدمية' : 'Direct access to Sub-committee Agendas & reports'}
               </AppText>
             </View>
             <View style={styles.featureItem}>
               <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
               <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'خاص بحسابات @egyptna.org المعتمدة' : 'Exclusive to verified @egyptna.org accounts'}
+                {isAr ? 'خاص ومقيد بحسابات @egyptna.org المعتمدة' : 'Exclusive to verified @egyptna.org accounts'}
               </AppText>
             </View>
           </View>
+
+          {/* Fallback Web Portal Option */}
+          <TouchableOpacity
+            style={styles.fallbackBtn}
+            onPress={handleWebFallbackLogin}
+            disabled={isAuthenticating}
+            activeOpacity={0.7}
+          >
+            <RefreshCw size={13} color={colors.textMuted} style={{ marginEnd: 6 }} />
+            <AppText variant="caption" color={colors.textMuted} weight="500">
+              {isAr ? 'استخدام بوابة الويب البديلة' : 'Use web redirect fallback'}
+            </AppText>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -243,7 +339,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 52,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   msButtonContent: {
     flexDirection: 'row',
@@ -264,7 +365,16 @@ const styles = StyleSheet.create({
     height: 8,
   },
   msButtonText: {
-    fontSize: 14,
+    fontSize: 15,
+  },
+  statusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e4f7fa',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 12,
   },
   featuresList: {
     marginTop: 20,
@@ -278,5 +388,12 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginEnd: 8,
+  },
+  fallbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 6,
   },
 });

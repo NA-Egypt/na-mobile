@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react-native';
 import { authApi, UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
+import { azureAuthService } from '../../src/services/azureAuthService';
 import { useAppTheme } from '../../src/theme';
 import {
   AppText,
@@ -94,17 +96,45 @@ export default function AgendasScreen() {
   };
 
   useEffect(() => {
-    authApi.getStoredUser().then((stored) => {
+    azureAuthService.checkSilentAuth().then((stored) => {
       setUser(stored);
       fetchAllData();
     });
   }, []);
 
-  const handleLogout = async () => {
-    haptic.light();
-    await authApi.logout();
-    setUser(null);
-    fetchAllData();
+  const handleLogout = () => {
+    haptic.selection();
+    Alert.alert(
+      isAr ? 'تسجيل الخروج الخدمي' : 'Servant Sign Out',
+      isAr
+        ? 'هل ترغب في تسجيل الخروج من التطبيق فقط أم إنهاء جلسة مايكروسوفت بالكامل؟'
+        : 'Do you want to sign out from the app only, or sign out completely from your Microsoft session?',
+      [
+        {
+          text: isAr ? 'إلغاء' : 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: isAr ? 'الخروج من التطبيق' : 'App Sign-out',
+          onPress: async () => {
+            haptic.light();
+            await azureAuthService.signOut(false);
+            setUser(null);
+            fetchAllData();
+          },
+        },
+        {
+          text: isAr ? 'خروج مايكروسوفت الكامل' : 'Full Microsoft Sign-out',
+          style: 'destructive',
+          onPress: async () => {
+            haptic.warning();
+            await azureAuthService.signOut(true);
+            setUser(null);
+            fetchAllData();
+          },
+        },
+      ]
+    );
   };
 
   const handleRefresh = async () => {
@@ -248,9 +278,16 @@ export default function AgendasScreen() {
                 <CheckCircle2 size={20} color={colors.success} />
               </View>
               <View style={styles.userInfo}>
-                <AppText variant="body" color={colors.textPrimary} weight="700">
-                  {user.name || (isAr ? 'خادم زمالة معتمد' : 'Trusted Servant')}
-                </AppText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <AppText variant="body" color={colors.textPrimary} weight="700">
+                    {user.name || (isAr ? 'خادم زمالة معتمد' : 'Trusted Servant')}
+                  </AppText>
+                  <Badge
+                    label={isAr ? 'حساب مايكروسوفت معتمد' : 'Verified MS Account'}
+                    variant="accent"
+                    size="sm"
+                  />
+                </View>
                 <AppText variant="caption" color={colors.textSecondary}>
                   {user.email}
                 </AppText>

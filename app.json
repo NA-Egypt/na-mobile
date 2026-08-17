@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "naegypt",
+    "scheme": ["naegypt", "msauth.org.naegypt.app"],
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
