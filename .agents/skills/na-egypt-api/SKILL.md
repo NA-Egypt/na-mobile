@@ -29,9 +29,21 @@ This skill provides a complete reference for integrating mobile applications (an
 
 ## 2. Authentication & Authorization Flow
 
+### Azure Active Directory v2.0 Identity Discovery Endpoints
+- **Authorization Endpoint:** `https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize`
+- **Token Endpoint:** `https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token`
+- **Logout / End Session Endpoint:** `https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout`
+- **Required Scopes:** `openid profile email offline_access User.Read`
+- **Redirect URIs:**
+  - Android: `msauth://org.naegypt.app/Xo8WBi6jzSxKDVR4drqm84yr9iU%3D`
+  - iOS: `msauth.org.naegypt.app://auth`
+  - Custom App Scheme: `naegypt://auth-callback`
+
+---
+
 ### Azure AD OAuth Login & Token Exchange
 
-Mobile apps authenticate the user via Azure Active Directory / Microsoft Identity SDK to acquire an Azure `access_token`, then exchange it for a backend Laravel Sanctum personal access token.
+Mobile apps authenticate the user via Azure Active Directory / Microsoft Identity SDK (PKCE authorization code flow) to acquire an Azure `access_token`, then exchange it for a backend Laravel Sanctum personal access token.
 
 #### `POST /api/v1/auth/azure/login` (or `/api/v1/login/azure`)
 - **Access:** Public
@@ -56,6 +68,12 @@ Mobile apps authenticate the user via Azure Active Directory / Microsoft Identit
   }
   ```
 
+#### `GET /auth/azure/redirect` *(Web Browser OAuth Fallback)*
+- **Access:** Public
+- **Query Parameters:**
+  - `redirect_uri`: Target app callback (e.g., `naegypt://auth-callback`)
+- **Behavior:** Redirects user through Microsoft login in browser and redirects back to `redirect_uri` with query parameters `?token=<sanctum_token>&user=<url_encoded_user_json>`.
+
 #### `GET /api/v1/user`
 - **Access:** Authenticated (`Bearer <sanctum_token>`)
 - **Response (200 OK):**
@@ -66,6 +84,16 @@ Mobile apps authenticate the user via Azure Active Directory / Microsoft Identit
     "email": "jane.doe@example.com",
     "service_body_id": 2,
     "roles": [...]
+  }
+  ```
+
+#### `POST /api/v1/auth/logout`
+- **Access:** Authenticated (`Bearer <sanctum_token>`)
+- **Behavior:** Revokes current Sanctum personal access token.
+- **Response (200 OK):**
+  ```json
+  {
+    "message": "Logged out successfully."
   }
   ```
 
