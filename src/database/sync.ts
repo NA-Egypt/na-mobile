@@ -297,7 +297,7 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 8. Events (Both /calendar-events and /events)
+      // 8. Events (Both /calendar-events, /events, and /home upcoming_events)
       const rawEvents: any[] = [];
       if (calendarEventsRes.status === 'fulfilled') {
         const calEvents = extractArray(calendarEventsRes.value);
@@ -310,34 +310,82 @@ export async function pullMasterData(): Promise<void> {
 
       const eventsCol = database.get<Event>('events');
       for (const item of rawEvents) {
-        if (!item?.id) continue;
-        const existing = await eventsCol.query(Q.where('remote_id', String(item.id))).fetch();
-        const start = item.start || item.start_date || '';
-        const end = item.end || item.end_date || '';
-        const organizer = item.organizer || '';
+        if (!item?.id && !item?.remote_id && !item?.title && !item?.name) continue;
+        const remoteId = String(item.id || item.remote_id || Math.random().toString());
+        const existing = await eventsCol.query(Q.where('remote_id', remoteId)).fetch();
+
+        const title =
+          item.title ||
+          item.ar_title ||
+          item.name ||
+          item.name_ar ||
+          item.en_title ||
+          item.event_name ||
+          'فعالية زمالة NA';
+
+        const description =
+          item.description ||
+          item.ar_description ||
+          item.en_description ||
+          item.details ||
+          item.content ||
+          '';
+
+        const start =
+          item.start ||
+          item.start_date ||
+          item.date ||
+          item.event_date ||
+          item.start_time ||
+          item.created_at ||
+          '';
+
+        const end =
+          item.end ||
+          item.end_date ||
+          item.end_time ||
+          start ||
+          '';
+
+        const location =
+          item.location ||
+          item.ar_location ||
+          item.en_location ||
+          item.address ||
+          item.ar_address ||
+          item.place ||
+          '';
+
+        const organizer =
+          item.organizer ||
+          item.organizer_name ||
+          item.service_body?.name ||
+          item.committee?.name ||
+          '';
+
         const recurrence =
           item.formatted_recurrence ||
           (Array.isArray(item.recurrence) ? item.recurrence.join(', ') : item.recurrence || '');
 
         if (existing.length > 0) {
           await existing[0].update((ev) => {
-            ev.title = item.title ?? ev.title;
-            ev.description = item.description ?? ev.description;
+            ev.title = title || ev.title;
+            ev.description = description || ev.description;
             ev.startDate = start || ev.startDate;
             ev.endDate = end || ev.endDate;
-            ev.location = item.location ?? ev.location;
-            ev.organizer = organizer ?? ev.organizer;
-            ev.recurrence = recurrence ?? ev.recurrence;
+            ev.location = location || ev.location;
+            ev.organizer = organizer || ev.organizer;
+            ev.recurrence = recurrence || ev.recurrence;
             ev.updatedAt = new Date();
           });
         } else {
           await eventsCol.create((ev) => {
-            ev.remoteId = String(item.id);
-            ev.title = item.title || '';
-            ev.description = item.description || '';
+            ev.remoteId = remoteId;
+            ev.title = title;
+            ev.description = description;
             ev.startDate = start;
             ev.endDate = end;
-            ev.location = item.location || '';
+            ev.location = location;
             ev.organizer = organizer;
             ev.recurrence = recurrence;
             ev.updatedAt = new Date();

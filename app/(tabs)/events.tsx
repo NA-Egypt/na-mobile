@@ -28,17 +28,31 @@ import * as Notifications from 'expo-notifications';
 import { database } from '../../src/database';
 import EventModel from '../../src/database/models/Event';
 import { pullMasterData } from '../../src/database/sync';
+import { eventsApi } from '../../src/api/events';
+import { homeApi } from '../../src/api/home';
 import { useAppTheme } from '../../src/theme';
 import { AppText, Badge, AppButton, EmptyState, LanguageSwitcher } from '../../src/components/ui';
 import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { haptic } from '../../src/utils/haptics';
+
+export interface DisplayEvent {
+  id: string;
+  remoteId?: string;
+  title: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  organizer?: string;
+  recurrence?: string;
+}
 
 export default function EventsScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const { colors, borderRadius, shadows } = useAppTheme();
 
-  const [events, setEvents] = useState<EventModel[]>([]);
+  const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [notifiedEvents, setNotifiedEvents] = useState<Record<string, boolean>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -50,11 +64,127 @@ export default function EventsScreen() {
     new Date().toISOString().split('T')[0]
   );
 
+  const normalizeEvent = (item: any): DisplayEvent => {
+    const id = String(item.id || item.remoteId || item.remote_id || Math.random().toString());
+    const title =
+      item.title ||
+      item.ar_title ||
+      item.name ||
+      item.name_ar ||
+      item.en_title ||
+      item.event_name ||
+      (isAr ? 'فعالية زمالة NA' : 'NA Event');
+    const description =
+      item.description ||
+      item.ar_description ||
+      item.en_description ||
+      item.details ||
+      item.content ||
+      '';
+    const start =
+      item.startDate ||
+      item.start_date ||
+      item.start ||
+      item.date ||
+      item.event_date ||
+      item.start_time ||
+      item.created_at ||
+      '';
+    const end =
+      item.endDate ||
+      item.end_date ||
+      item.end ||
+      item.end_time ||
+      start ||
+      '';
+    const location =
+      item.location ||
+      item.ar_location ||
+      item.en_location ||
+      item.address ||
+      item.ar_address ||
+      item.place ||
+      '';
+    const organizer =
+      item.organizer ||
+      item.organizer_name ||
+      item.service_body?.name ||
+      item.committee?.name ||
+      '';
+    const recurrence =
+      item.recurrence ||
+      item.formatted_recurrence ||
+      (Array.isArray(item.recurrence) ? item.recurrence.join(', ') : '');
+
+    return {
+      id,
+      remoteId: item.remoteId || item.remote_id || id,
+      title,
+      description,
+      startDate: start,
+      endDate: end,
+      location,
+      organizer,
+      recurrence: typeof recurrence === 'string' ? recurrence : '',
+    };
+  };
+
+  const sortEvents = (items: DisplayEvent[]): DisplayEvent[] => {
+    return [...items].sort((a, b) => {
+      if (!a.startDate) return 1;
+      if (!b.startDate) return -1;
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    });
+  };
+
   const loadEvents = async () => {
     try {
+      // 1. Fetch from local DB first
       const eventsCollection = database.get<EventModel>('events');
-      const allEvents = await eventsCollection.query().fetch();
-      setEvents(allEvents);
+      const localModels = await eventsCollection.query().fetch();
+      const localList: DisplayEvent[] = localModels.map((m) => ({
+        id: m.id,
+        remoteId: m.remoteId,
+        title: m.title || '',
+        description: m.description,
+        startDate: m.startDate,
+        endDate: m.endDate,
+        location: m.location,
+        organizer: m.organizer,
+        recurrence: m.recurrence,
+      }));
+
+      if (localList.length > 0) {
+        setEvents(sortEvents(localList));
+      }
+
+      // 2. Fetch live APIs concurrently
+      const [calRes, evRes, homeRes] = await Promise.allSettled([
+        eventsApi.getCalendarEvents(),
+        eventsApi.getEvents(),
+        homeApi.getHomeData(),
+      ]);
+
+      const liveItems: DisplayEvent[] = [];
+
+      if (calRes.status === 'fulfilled' && Array.isArray(calRes.value)) {
+        calRes.value.forEach((ev) => liveItems.push(normalizeEvent(ev)));
+      }
+      if (evRes.status === 'fulfilled' && Array.isArray(evRes.value)) {
+        evRes.value.forEach((ev) => liveItems.push(normalizeEvent(ev)));
+      }
+      if (homeRes.status === 'fulfilled' && Array.isArray(homeRes.value?.upcoming_events)) {
+        homeRes.value.upcoming_events.forEach((ev) => liveItems.push(normalizeEvent(ev)));
+      }
+
+      if (liveItems.length > 0) {
+        // Merge & deduplicate by remoteId / id / title
+        const map = new Map<string, DisplayEvent>();
+        localList.forEach((e) => map.set(e.remoteId || e.id, e));
+        liveItems.forEach((e) => map.set(e.remoteId || e.id, e));
+        const merged = sortEvents(Array.from(map.values()));
+        setEvents(merged);
+      }
     } catch (e) {
       console.warn('Error loading events:', e);
     } finally {
@@ -64,7 +194,7 @@ export default function EventsScreen() {
 
   useEffect(() => {
     loadEvents();
-    pullMasterData().then(() => loadEvents());
+    pullMasterData().catch(() => {});
 
     const subscription = database
       .get<EventModel>('events')
@@ -80,12 +210,12 @@ export default function EventsScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await pullMasterData();
+    await pullMasterData().catch(() => {});
     await loadEvents();
     setIsRefreshing(false);
   };
 
-  const handleScheduleNotification = async (event: EventModel) => {
+  const handleScheduleNotification = async (event: DisplayEvent) => {
     if (Platform.OS === 'web') return;
 
     haptic.light();
@@ -159,7 +289,7 @@ export default function EventsScreen() {
       acc[d].push(ev);
     }
     return acc;
-  }, {} as Record<string, EventModel[]>);
+  }, {} as Record<string, DisplayEvent[]>);
 
   const selectedDayEvents = eventsByDate[selectedDateStr] || [];
 

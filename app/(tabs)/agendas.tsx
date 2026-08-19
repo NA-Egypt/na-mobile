@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
   Lock,
@@ -19,6 +19,7 @@ import {
   FileText,
   X,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle2,
   Eye,
   FolderX,
@@ -29,6 +30,7 @@ import {
   FileArchive,
   DownloadCloud,
   Layers,
+  RefreshCw,
 } from 'lucide-react-native';
 import { authApi, UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
@@ -59,13 +61,30 @@ export default function AgendasScreen() {
   const [groupAgendas, setGroupAgendas] = useState<any[]>([]);
   const [serviceBodyAgendas, setServiceBodyAgendas] = useState<any[]>([]);
   const [committeeReports, setCommitteeReports] = useState<any[]>([]);
+  const [tabForbidden, setTabForbidden] = useState<Record<AgendaTabType, boolean>>({
+    groups: false,
+    service_bodies: false,
+    committees_archive: false,
+  });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (currentUser?: UserProfile | null) => {
+    const activeUser = currentUser !== undefined ? currentUser : user;
+    if (!activeUser) {
+      setGroupAgendas([]);
+      setServiceBodyAgendas([]);
+      setCommitteeReports([]);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
     setIsLoading(true);
+    setTabForbidden({ groups: false, service_bodies: false, committees_archive: false });
+
     try {
       const [agendasRes, sbRes, reportsRes] = await Promise.allSettled([
         apiClient.get('/agendas'),
@@ -76,31 +95,57 @@ export default function AgendasScreen() {
       if (agendasRes.status === 'fulfilled') {
         const data = agendasRes.value.data?.data || agendasRes.value.data || [];
         setGroupAgendas(Array.isArray(data) ? data : []);
+      } else {
+        const status = (agendasRes.reason as any)?.response?.status;
+        if (status === 403) {
+          setTabForbidden((prev) => ({ ...prev, groups: true }));
+        }
+        setGroupAgendas([]);
       }
 
       if (sbRes.status === 'fulfilled') {
         const data = sbRes.value.data?.data || sbRes.value.data || [];
         setServiceBodyAgendas(Array.isArray(data) ? data : []);
+      } else {
+        const status = (sbRes.reason as any)?.response?.status;
+        if (status === 403) {
+          setTabForbidden((prev) => ({ ...prev, service_bodies: true }));
+        }
+        setServiceBodyAgendas([]);
       }
 
       if (reportsRes.status === 'fulfilled') {
         const data = reportsRes.value.data?.data || reportsRes.value.data || [];
         setCommitteeReports(Array.isArray(data) ? data : []);
+      } else {
+        const status = (reportsRes.reason as any)?.response?.status;
+        if (status === 403) {
+          setTabForbidden((prev) => ({ ...prev, committees_archive: true }));
+        }
+        setCommitteeReports([]);
       }
     } catch (e) {
-      console.warn('Error loading agendas/reports:', e);
+      console.warn('Error loading agendas/reports with auth:', e);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    azureAuthService.checkSilentAuth().then((stored) => {
-      setUser(stored);
-      fetchAllData();
-    });
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      azureAuthService.checkSilentAuth().then((stored) => {
+        setUser(stored);
+        if (stored) {
+          fetchAllData(stored);
+        } else {
+          setGroupAgendas([]);
+          setServiceBodyAgendas([]);
+          setCommitteeReports([]);
+        }
+      });
+    }, [])
+  );
 
   const handleLogout = () => {
     haptic.selection();
@@ -120,7 +165,9 @@ export default function AgendasScreen() {
             haptic.light();
             await azureAuthService.signOut(false);
             setUser(null);
-            fetchAllData();
+            setGroupAgendas([]);
+            setServiceBodyAgendas([]);
+            setCommitteeReports([]);
           },
         },
         {
@@ -130,7 +177,9 @@ export default function AgendasScreen() {
             haptic.warning();
             await azureAuthService.signOut(true);
             setUser(null);
-            fetchAllData();
+            setGroupAgendas([]);
+            setServiceBodyAgendas([]);
+            setCommitteeReports([]);
           },
         },
       ]
@@ -138,6 +187,7 @@ export default function AgendasScreen() {
   };
 
   const handleRefresh = async () => {
+    if (!user) return;
     setIsRefreshing(true);
     haptic.light();
     await fetchAllData();
@@ -339,8 +389,87 @@ export default function AgendasScreen() {
           )}
         </View>
 
-        {/* Main List Area */}
-        {isLoading ? (
+        {/* Main Content Area */}
+        {!user ? (
+          <ScrollView contentContainerStyle={styles.loggedOutScrollContent}>
+            <View
+              style={[
+                styles.loggedOutCard,
+                shadows.card,
+                {
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.cardBorder,
+                  borderRadius: borderRadius.card,
+                },
+              ]}
+            >
+              <View style={[styles.lockLargeIcon, { backgroundColor: colors.accentLight }]}>
+                <Lock size={30} color={colors.accentDark} />
+              </View>
+              <AppText variant="h3" color={colors.textPrimary} weight="800" style={{ textAlign: 'center', marginBottom: 6 }}>
+                {activeTab === 'groups'
+                  ? isAr
+                    ? 'أجندات المجموعات - خادمي المجموعات'
+                    : 'Group Agendas - Trusted Servants'
+                  : activeTab === 'service_bodies'
+                  ? isAr
+                    ? 'أجندات الهيئات - مجلس الخدمة'
+                    : 'Service Body Agendas'
+                  : isAr
+                  ? 'أرشيف تقارير اللجان الخدمية'
+                  : 'Committee Reports Archive'}
+              </AppText>
+              <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
+                {isAr
+                  ? 'هذا القسم مخصص للخدام المعتمدين في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ egyptna.org للاطلاع على البيانات والتقارير المتاحة لرتبتك الخدمية.'
+                  : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official egyptna.org Microsoft account to access reports and agendas permitted for your role.'}
+              </AppText>
+              <AppButton
+                title={t('agendas.login_prompt')}
+                onPress={() => {
+                  haptic.selection();
+                  router.push('/login');
+                }}
+                variant="primary"
+                size="md"
+                style={{ width: '100%' }}
+              />
+            </View>
+          </ScrollView>
+        ) : tabForbidden[activeTab] ? (
+          <ScrollView contentContainerStyle={styles.loggedOutScrollContent}>
+            <View
+              style={[
+                styles.loggedOutCard,
+                shadows.card,
+                {
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.cardBorder,
+                  borderRadius: borderRadius.card,
+                },
+              ]}
+            >
+              <View style={[styles.lockLargeIcon, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <ShieldAlert size={30} color={colors.danger} />
+              </View>
+              <AppText variant="h3" color={colors.textPrimary} weight="800" style={{ textAlign: 'center', marginBottom: 6 }}>
+                {isAr ? 'الصلاحية غير متوفرة لهذا الحساب' : 'Access Restricted for Your Role'}
+              </AppText>
+              <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 16 }}>
+                {isAr
+                  ? `يتطلب هذا القسم صلاحيات محددة (مثل RSC أو هيئة خدمة). رتبتك المسجلة حالياً: ${user.roles?.join(', ') || (isAr ? 'خادم موثوق' : 'Servant')}.`
+                  : `This section requires specific permissions (RSC or Service Body). Your registered role: ${user.roles?.join(', ') || 'Servant'}.`}
+              </AppText>
+              <AppButton
+                title={isAr ? 'تحديث الصلاحيات' : 'Refresh Permissions'}
+                onPress={handleRefresh}
+                variant="outline"
+                size="sm"
+                icon={<RefreshCw size={14} color={colors.primary} />}
+              />
+            </View>
+          </ScrollView>
+        ) : isLoading ? (
           <View style={styles.loadingContainer}>
             <View
               style={[
@@ -563,26 +692,12 @@ export default function AgendasScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon={<FolderX size={44} color={colors.accent} />}
-                title={
-                  user
-                    ? isAr
-                      ? 'لا توجد سجلات مسجلة في هذا القسم'
-                      : 'No records found in this section'
-                    : isAr
-                      ? 'تسجيل الدخول مطلوب'
-                      : 'Sign in Required'
-                }
+                title={isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section'}
                 description={
-                  user
-                    ? isAr
-                      ? 'يتم مزامنة تقارير وأرشيف اللجان وجداول الأعمال مباشرة من قاعدة بيانات egyptna.org.'
-                      : 'Agendas and Committee records synchronize directly from egyptna.org.'
-                    : isAr
-                      ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف اللجان والتقارير المعتمدة.'
-                      : 'Sign in with your Microsoft account to access approved committee archives.'
+                  isAr
+                    ? 'يتم مزامنة تقارير وأرشيف اللجان وجداول الأعمال مباشرة من قاعدة بيانات egyptna.org وفقاً لصلاحيات حسابك.'
+                    : 'Agendas and Committee records synchronize directly from egyptna.org according to your role permissions.'
                 }
-                primaryActionTitle={!user ? t('agendas.login_prompt') : undefined}
-                onPrimaryAction={!user ? () => router.push('/login') : undefined}
               />
             }
           />
@@ -849,5 +964,23 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     marginTop: 18,
+  },
+  loggedOutScrollContent: {
+    padding: 16,
+    paddingTop: 24,
+  },
+  loggedOutCard: {
+    padding: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockLargeIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
 });

@@ -45,23 +45,19 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
       isAnimationStarted.current = true;
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 500,
+        duration: 350,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         if (onFinish) onFinish();
       });
-    }, 1400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [isReady]);
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      {/* Decorative radial gradient backdrop effect */}
-      <View style={styles.glowCircle} />
-      <View style={styles.secondaryGlow} />
-
       <Animated.View
         style={[
           styles.content,
@@ -72,9 +68,7 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
         ]}
       >
         <View style={styles.logoContainer}>
-          <View style={styles.logoRing}>
-            <NALogo size={115} />
-          </View>
+          <NALogo size={110} />
         </View>
 
         <Text style={styles.titleAr}>زمالة المدمنين المجهولين في مصر</Text>
@@ -114,20 +108,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999999,
   },
-  glowCircle: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'rgba(16, 179, 207, 0.08)',
-  },
-  secondaryGlow: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(245, 158, 11, 0.05)',
-  },
   content: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -135,18 +115,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 24,
-  },
-  logoRing: {
-    padding: 12,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.35)', // Golden emblem ring
-    shadowColor: '#10b3cf',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleAr: {
     fontSize: 22,

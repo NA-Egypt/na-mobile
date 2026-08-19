@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import {
   X,
   PhoneCall,
+  PhoneOff,
+  RefreshCw,
   MessageCircle,
   Mail,
   Share2,
@@ -21,9 +24,10 @@ import {
   HeartHandshake,
 } from 'lucide-react-native';
 import { homeApi } from '../api/home';
+import { apiClient } from '../api/client';
 import { HelplineItem, SocialLinks } from '../api/types';
 import { useAppTheme } from '../theme';
-import { AppText, Badge } from './ui';
+import { AppText, Badge, AppButton } from './ui';
 import { haptic } from '../utils/haptics';
 
 interface HelplineModalProps {
@@ -38,64 +42,70 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
   const [helplines, setHelplines] = useState<HelplineItem[]>([]);
   const [socialLinks, setSocialLinks] = useState<SocialLinks | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchHelplines = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      let fetchedHelplines: HelplineItem[] = [];
+      let fetchedSocial: SocialLinks | null = null;
+
+      // 1. Try home/frontpage consolidated API
+      try {
+        const homeData = await homeApi.getHomeData();
+        if (homeData?.helplines && Array.isArray(homeData.helplines) && homeData.helplines.length > 0) {
+          fetchedHelplines = homeData.helplines;
+        }
+        if (homeData?.social_links) {
+          fetchedSocial = homeData.social_links;
+        }
+      } catch (homeErr) {
+        console.warn('Home data endpoint error in HelplineModal:', homeErr);
+      }
+
+      // 2. Fallback: If no helplines from /home, check /service-bodies for area phone contacts
+      if (fetchedHelplines.length === 0) {
+        try {
+          const sbRes = await apiClient.get('/service-bodies');
+          const sbList = Array.isArray(sbRes.data?.data)
+            ? sbRes.data.data
+            : Array.isArray(sbRes.data)
+            ? sbRes.data
+            : [];
+
+          const sbHelplines = sbList
+            .filter((sb: any) => sb.phone || sb.email)
+            .map((sb: any) => ({
+              region: sb.en_name || sb.name || 'Area Service',
+              region_ar: sb.ar_name || sb.name_ar || sb.area_name || 'هيئة الخدمة',
+              phones: sb.phone ? [sb.phone] : [],
+              whatsapp: sb.phone ? `https://wa.me/${sb.phone.replace(/[^0-9]/g, '')}` : undefined,
+            }));
+
+          if (sbHelplines.length > 0) {
+            fetchedHelplines = sbHelplines;
+          }
+        } catch (sbErr) {
+          console.warn('Service bodies fallback error in HelplineModal:', sbErr);
+        }
+      }
+
+      setHelplines(fetchedHelplines);
+      setSocialLinks(fetchedSocial);
+    } catch (err: any) {
+      setError(isAr ? 'تعذر جلب بيانات خطوط المساعدة من الخادم.' : 'Could not retrieve helpline data from server.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (visible) {
-      homeApi
-        .getHomeData()
-        .then((data) => {
-          if (data?.helplines?.length) {
-            setHelplines(data.helplines);
-          } else {
-            setHelplines(defaultHelplines);
-          }
-          if (data?.social_links) {
-            setSocialLinks(data.social_links);
-          } else {
-            setSocialLinks(defaultSocialLinks);
-          }
-        })
-        .catch(() => {
-          setHelplines(defaultHelplines);
-          setSocialLinks(defaultSocialLinks);
-        });
+      fetchHelplines();
     }
   }, [visible]);
-
-  const defaultHelplines: HelplineItem[] = [
-    {
-      region: 'Cairo & Giza',
-      region_ar: 'القاهرة والجيزة',
-      phones: ['+201006979198', '+201060933888'],
-      whatsapp: 'https://wa.me/201060933888',
-    },
-    {
-      region: 'Alexandria & North Coast',
-      region_ar: 'الإسكندرية والساحل الشمالي',
-      phones: ['+201288220038', '+201006979198'],
-      whatsapp: 'https://wa.me/201288220038',
-    },
-    {
-      region: 'Delta & Canal Cities',
-      region_ar: 'الدلتا ومدن القناة',
-      phones: ['+201060933888'],
-      whatsapp: 'https://wa.me/201060933888',
-    },
-    {
-      region: 'Upper Egypt & Red Sea',
-      region_ar: 'الصعيد والبحر الأحمر',
-      phones: ['+201006979198'],
-      whatsapp: 'https://wa.me/201006979198',
-    },
-  ];
-
-  const defaultSocialLinks: SocialLinks = {
-    facebook: 'https://www.facebook.com/OfficialNAEgyPage',
-    instagram: 'https://www.instagram.com/narcoticsanonymousegy',
-    tiktok: 'https://www.tiktok.com/@narcoticsanonymousegypt',
-    whatsapp: 'https://wa.me/201060933888',
-    email: 'pr@naegypt.org',
-  };
 
   const handleCall = (phone: string) => {
     haptic.selection();
@@ -105,9 +115,9 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
   };
 
   const handleWhatsApp = (url?: string) => {
+    if (!url) return;
     haptic.selection();
-    const target = url || defaultSocialLinks.whatsapp || 'https://wa.me/201060933888';
-    Linking.openURL(target).catch(() => {
+    Linking.openURL(url).catch(() => {
       Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'تعذر فتح واتساب.' : 'Could not open WhatsApp.');
     });
   };
@@ -183,63 +193,97 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
             {isAr ? 'أرقام خطوط المساعدة حسب المحافظة' : 'Regional Helpline Numbers'}
           </AppText>
 
-          {helplines.map((item, index) => (
-            <View
-              key={index}
-              style={[
-                styles.helplineCard,
-                shadows.card,
-                {
-                  backgroundColor: colors.cardBg,
-                  borderColor: colors.cardBorder,
-                  borderRadius: borderRadius.card,
-                },
-              ]}
-            >
-              <View style={styles.helplineHeader}>
-                <AppText variant="h4" color={colors.textPrimary} weight="700">
-                  {isAr ? item.region_ar || item.region : item.region}
-                </AppText>
-                <Badge
-                  label={isAr ? 'متاح يومياً' : 'Daily Support'}
-                  variant="success"
-                  size="sm"
-                />
-              </View>
-
-              <View style={styles.phoneList}>
-                {item.phones.map((phone, pIdx) => (
-                  <TouchableOpacity
-                    key={pIdx}
-                    style={[styles.phoneButton, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}
-                    onPress={() => handleCall(phone)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[styles.btnIconCircle, { backgroundColor: colors.accentLight }]}>
-                      <PhoneCall size={14} color={colors.accentDark} />
-                    </View>
-                    <AppText variant="body" color={colors.primary} weight="700" style={styles.phoneText}>
-                      {phone}
-                    </AppText>
-                    <Badge label={isAr ? 'اتصال مباشر' : 'Call'} variant="accent" size="sm" />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {item.whatsapp ? (
-                <TouchableOpacity
-                  style={[styles.whatsappButton, { backgroundColor: '#25D366' }]}
-                  onPress={() => handleWhatsApp(item.whatsapp)}
-                  activeOpacity={0.85}
-                >
-                  <MessageCircle size={18} color="#ffffff" style={{ marginEnd: 8 }} />
-                  <AppText variant="body" color="#ffffff" weight="700">
-                    {isAr ? 'تواصل عبر واتساب فوراً' : 'Chat on WhatsApp'}
-                  </AppText>
-                </TouchableOpacity>
-              ) : null}
+          {isLoading ? (
+            <View style={[styles.loadingContainer, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <ActivityIndicator size="small" color={colors.accent} style={{ marginBottom: 10 }} />
+              <AppText variant="caption" color={colors.textSecondary}>
+                {isAr ? 'جاري تحميل أرقام المساعدة المعتمدة...' : 'Loading official helpline numbers...'}
+              </AppText>
             </View>
-          ))}
+          ) : helplines.length > 0 ? (
+            helplines.map((item, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.helplineCard,
+                  shadows.card,
+                  {
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.cardBorder,
+                    borderRadius: borderRadius.card,
+                  },
+                ]}
+              >
+                <View style={styles.helplineHeader}>
+                  <AppText variant="h4" color={colors.textPrimary} weight="700">
+                    {isAr ? item.region_ar || item.region : item.region}
+                  </AppText>
+                  <Badge
+                    label={isAr ? 'متاح يومياً' : 'Daily Support'}
+                    variant="success"
+                    size="sm"
+                  />
+                </View>
+
+                <View style={styles.phoneList}>
+                  {item.phones && item.phones.length > 0 ? (
+                    item.phones.map((phone, pIdx) => (
+                      <TouchableOpacity
+                        key={pIdx}
+                        style={[styles.phoneButton, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}
+                        onPress={() => handleCall(phone)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.btnIconCircle, { backgroundColor: colors.accentLight }]}>
+                          <PhoneCall size={14} color={colors.accentDark} />
+                        </View>
+                        <AppText variant="body" color={colors.primary} weight="700" style={styles.phoneText}>
+                          {phone}
+                        </AppText>
+                        <Badge label={isAr ? 'اتصال مباشر' : 'Call'} variant="accent" size="sm" />
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <AppText variant="caption" color={colors.textSecondary}>
+                      {isAr ? 'لا يوجد رقم هاتف مسجل لهذه المنطقة' : 'No phone number listed for this region'}
+                    </AppText>
+                  )}
+                </View>
+
+                {item.whatsapp ? (
+                  <TouchableOpacity
+                    style={[styles.whatsappButton, { backgroundColor: '#25D366' }]}
+                    onPress={() => handleWhatsApp(item.whatsapp)}
+                    activeOpacity={0.85}
+                  >
+                    <MessageCircle size={18} color="#ffffff" style={{ marginEnd: 8 }} />
+                    <AppText variant="body" color="#ffffff" weight="700">
+                      {isAr ? 'تواصل عبر واتساب فوراً' : 'Chat on WhatsApp'}
+                    </AppText>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ))
+          ) : (
+            <View style={[styles.emptyContainer, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
+              <PhoneOff size={32} color={colors.textMuted} style={{ marginBottom: 8 }} />
+              <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: 'center', marginBottom: 4 }}>
+                {isAr ? 'لا توجد خطوط مساعدة مسجلة في الـ API حالياً' : 'No Helplines Currently Available'}
+              </AppText>
+              <AppText variant="caption" color={colors.textSecondary} style={{ textAlign: 'center', marginBottom: 12 }}>
+                {isAr
+                  ? 'يتم تحديث خطوط المساعدة مباشرة من إدارة الزمالة عبر egyptna.org.'
+                  : 'Helplines are maintained and published directly from egyptna.org.'}
+              </AppText>
+              <AppButton
+                title={isAr ? 'إعادة المحاولة' : 'Retry'}
+                onPress={fetchHelplines}
+                variant="outline"
+                size="sm"
+                icon={<RefreshCw size={14} color={colors.primary} />}
+              />
+            </View>
+          )}
 
           {/* Official Social Media Channels */}
           <AppText variant="h4" color={colors.textPrimary} weight="800" style={[styles.sectionTitle, { marginTop: 16 }]}>
@@ -439,5 +483,20 @@ const styles = StyleSheet.create({
   },
   socialTextCol: {
     flex: 1,
+  },
+  loadingContainer: {
+    padding: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyContainer: {
+    padding: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
 });

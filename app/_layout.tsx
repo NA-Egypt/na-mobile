@@ -18,16 +18,13 @@ export default function RootLayout() {
   const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
-    // Seed initial local database tables & pull live data
-    seedInitialLocalData()
-      .then(async () => {
-        await pullMasterData().catch(() => {});
-        setIsDataLoaded(true);
-      })
-      .catch((err) => {
-        console.warn('Initial data seeding error:', err);
-        setIsDataLoaded(true);
-      });
+    // Set data loaded immediately so the splash screen doesn't block the UI
+    setIsDataLoaded(true);
+
+    // Seed local DB & pull live data asynchronously in background
+    seedInitialLocalData().catch((err) => {
+      console.warn('Initial background data sync notice:', err);
+    });
 
     // Start network listener for outbox queue worker
     const unsubscribeOutbox = startOutboxNetworkListener();
