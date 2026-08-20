@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, StyleSheet } from 'react-native';
-import { MapPin, Calendar, FileText, Send } from 'lucide-react-native';
+import { Home, MapPin, Calendar, FileText, Send } from 'lucide-react-native';
 import { useAppTheme } from '../../src/theme';
 import { haptic } from '../../src/utils/haptics';
 
@@ -42,10 +42,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: t('tabs.home'),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
+              <Home color={color} size={focused ? 23 : 21} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="meetings"
+        options={{
           title: t('tabs.meetings'),
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <MapPin color={color} size={focused ? 24 : 22} />
+              <MapPin color={color} size={focused ? 23 : 21} />
             </View>
           ),
         }}
@@ -56,7 +67,7 @@ export default function TabsLayout() {
           title: t('tabs.events'),
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <Calendar color={color} size={focused ? 24 : 22} />
+              <Calendar color={color} size={focused ? 23 : 21} />
             </View>
           ),
         }}
@@ -67,7 +78,7 @@ export default function TabsLayout() {
           title: t('tabs.agendas'),
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <FileText color={color} size={focused ? 24 : 22} />
+              <FileText color={color} size={focused ? 23 : 21} />
             </View>
           ),
         }}
@@ -78,7 +89,7 @@ export default function TabsLayout() {
           title: t('tabs.contact'),
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <Send color={color} size={focused ? 24 : 22} />
+              <Send color={color} size={focused ? 23 : 21} />
             </View>
           ),
         }}

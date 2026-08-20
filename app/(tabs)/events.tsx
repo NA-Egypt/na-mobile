@@ -31,8 +31,7 @@ import { pullMasterData } from '../../src/database/sync';
 import { eventsApi } from '../../src/api/events';
 import { homeApi } from '../../src/api/home';
 import { useAppTheme } from '../../src/theme';
-import { AppText, Badge, AppButton, EmptyState, LanguageSwitcher } from '../../src/components/ui';
-import { ThemeToggle } from '../../src/components/ThemeToggle';
+import { AppText, Badge, AppButton, EmptyState, AppHeader } from '../../src/components/ui';
 import { haptic } from '../../src/utils/haptics';
 
 export interface DisplayEvent {
@@ -50,7 +49,7 @@ export interface DisplayEvent {
 export default function EventsScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const { colors, borderRadius, shadows } = useAppTheme();
+  const { colors, borderRadius, shadows, isDark } = useAppTheme();
 
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
@@ -65,7 +64,19 @@ export default function EventsScreen() {
   );
 
   const normalizeEvent = (item: any): DisplayEvent => {
-    const id = String(item.id || item.remoteId || item.remote_id || Math.random().toString());
+    const rawId = String(item.id || item.remoteId || item.remote_id || Math.random().toString());
+    const start =
+      item.startDate ||
+      item.start_date ||
+      item.start ||
+      item.date ||
+      item.event_date ||
+      item.start_time ||
+      item.created_at ||
+      '';
+    const occurrenceDate = start ? start.slice(0, 10) : '';
+    const occurrenceId = occurrenceDate && !rawId.includes('_') ? `${rawId}_${occurrenceDate}` : rawId;
+
     const title =
       item.title ||
       item.ar_title ||
@@ -80,15 +91,6 @@ export default function EventsScreen() {
       item.en_description ||
       item.details ||
       item.content ||
-      '';
-    const start =
-      item.startDate ||
-      item.start_date ||
-      item.start ||
-      item.date ||
-      item.event_date ||
-      item.start_time ||
-      item.created_at ||
       '';
     const end =
       item.endDate ||
@@ -117,8 +119,8 @@ export default function EventsScreen() {
       (Array.isArray(item.recurrence) ? item.recurrence.join(', ') : '');
 
     return {
-      id,
-      remoteId: item.remoteId || item.remote_id || id,
+      id: occurrenceId,
+      remoteId: occurrenceId,
       title,
       description,
       startDate: start,
@@ -137,7 +139,7 @@ export default function EventsScreen() {
     });
   };
 
-  const loadEvents = async () => {
+  const loadEvents = async (customDate?: Date) => {
     try {
       // 1. Fetch from local DB first
       const eventsCollection = database.get<EventModel>('events');
@@ -158,9 +160,14 @@ export default function EventsScreen() {
         setEvents(sortEvents(localList));
       }
 
-      // 2. Fetch live APIs concurrently
+      // Calculate wide rolling window (1 month past to 12 months ahead)
+      const baseDate = customDate || currentDate || new Date();
+      const startDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1).toISOString().split('T')[0];
+      const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 13, 0).toISOString().split('T')[0];
+
+      // 2. Fetch live APIs concurrently with expanded recurring events range
       const [calRes, evRes, homeRes] = await Promise.allSettled([
-        eventsApi.getCalendarEvents(),
+        eventsApi.getCalendarEvents({ start: startDate, end: endDate }),
         eventsApi.getEvents(),
         homeApi.getHomeData(),
       ]);
@@ -174,14 +181,20 @@ export default function EventsScreen() {
         evRes.value.forEach((ev) => liveItems.push(normalizeEvent(ev)));
       }
       if (homeRes.status === 'fulfilled' && Array.isArray(homeRes.value?.upcoming_events)) {
-        homeRes.value.upcoming_events.forEach((ev) => liveItems.push(normalizeEvent(ev)));
+        homeRes.value.upcoming_events.forEach((ev: any) => liveItems.push(normalizeEvent(ev)));
       }
 
-      if (liveItems.length > 0) {
-        // Merge & deduplicate by remoteId / id / title
+      if (liveItems.length > 0 || localList.length > 0) {
+        // Merge & deduplicate by composite occurrence key (remoteId / id_date)
         const map = new Map<string, DisplayEvent>();
-        localList.forEach((e) => map.set(e.remoteId || e.id, e));
-        liveItems.forEach((e) => map.set(e.remoteId || e.id, e));
+        localList.forEach((e) => {
+          const key = e.remoteId || `${e.id}_${e.startDate?.slice(0, 10) || ''}`;
+          map.set(key, e);
+        });
+        liveItems.forEach((e) => {
+          const key = e.remoteId || `${e.id}_${e.startDate?.slice(0, 10) || ''}`;
+          map.set(key, e);
+        });
         const merged = sortEvents(Array.from(map.values()));
         setEvents(merged);
       }
@@ -305,36 +318,16 @@ export default function EventsScreen() {
   const dayLabelsEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
-      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
-        {/* Header Banner */}
-        <View style={styles.headerBanner}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight + '40' }]}>
-            <CalendarIcon size={20} color={colors.accent} />
-          </View>
-          <View style={styles.headerTextCol}>
-            <AppText variant="h3" color="#ffffff" weight="800">
-              {isAr ? 'فعاليات وأنشطة الزمالة' : 'Events & Activities'}
-            </AppText>
-            <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
-              {isAr
-                ? 'مواعيد المؤتمرات، الأيام التعليمية، واجتماعات لجان الخدمة'
-                : 'Conventions, Learning Days, and Regional Committee Meetings'}
-            </AppText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle />
-            <LanguageSwitcher />
-          </View>
-        </View>
-
-        {/* View Mode Segmented Switch (Calendar / List) */}
-        <View style={styles.modeSwitchWrapper}>
-          <View style={[styles.modeSwitchContainer, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}>
+    <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
+      <AppHeader
+        title={isAr ? 'فعاليات وأنشطة الزمالة' : 'Events & Activities'}
+        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • Fellowship Calendar'}
+        bottomSlot={
+          <View style={styles.modeSwitchContainer}>
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                viewMode === 'calendar' && [styles.modeButtonActive, { backgroundColor: colors.cardBg }],
+                viewMode === 'calendar' && [styles.modeButtonActive, { backgroundColor: isDark ? colors.cardBg : '#ffffff' }],
               ]}
               onPress={() => {
                 haptic.selection();
@@ -344,12 +337,12 @@ export default function EventsScreen() {
             >
               <CalendarIcon
                 size={16}
-                color={viewMode === 'calendar' ? colors.primary : '#ffffff'}
+                color={viewMode === 'calendar' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
                 style={{ marginEnd: 6 }}
               />
               <AppText
                 variant="label"
-                color={viewMode === 'calendar' ? colors.primary : '#ffffff'}
+                color={viewMode === 'calendar' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
                 weight="700"
               >
                 {isAr ? 'التقويم الشهري' : 'Calendar View'}
@@ -359,7 +352,7 @@ export default function EventsScreen() {
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                viewMode === 'list' && [styles.modeButtonActive, { backgroundColor: colors.cardBg }],
+                viewMode === 'list' && [styles.modeButtonActive, { backgroundColor: isDark ? colors.cardBg : '#ffffff' }],
               ]}
               onPress={() => {
                 haptic.selection();
@@ -369,20 +362,20 @@ export default function EventsScreen() {
             >
               <List
                 size={16}
-                color={viewMode === 'list' ? colors.primary : '#ffffff'}
+                color={viewMode === 'list' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
                 style={{ marginEnd: 6 }}
               />
               <AppText
                 variant="label"
-                color={viewMode === 'list' ? colors.primary : '#ffffff'}
+                color={viewMode === 'list' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
                 weight="700"
               >
                 {isAr ? 'عرض القائمة' : 'List View'}
               </AppText>
             </TouchableOpacity>
           </View>
-        </View>
-      </SafeAreaView>
+        }
+      />
 
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
         {viewMode === 'calendar' ? (

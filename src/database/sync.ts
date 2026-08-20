@@ -20,6 +20,11 @@ const extractArray = (res: any): any[] => {
 
 export async function pullMasterData(): Promise<void> {
   try {
+    const now = new Date();
+    // Preload a 14-month rolling window (1 month past to 12 months ahead) so all recurring events are expanded
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 13, 0).toISOString().split('T')[0];
+
     const [
       meetingsRes,
       groupsRes,
@@ -30,16 +35,18 @@ export async function pullMasterData(): Promise<void> {
       topicsRes,
       optionsRes,
       daysRes,
+      homeRes,
     ] = await Promise.allSettled([
       apiClient.get('/meetings'),
-      apiClient.get('/groups'),
+      apiClient.get('/groups', { params: { per_page: 100 } }),
       apiClient.get('/cities'),
       apiClient.get('/neighborhoods'),
       apiClient.get('/events'),
-      apiClient.get('/calendar-events'),
+      apiClient.get('/calendar-events', { params: { start: startDate, end: endDate } }),
       apiClient.get('/topics'),
       apiClient.get('/options'),
       apiClient.get('/days'),
+      apiClient.get('/home'),
     ]);
 
     await database.write(async () => {
@@ -118,12 +125,51 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 4. Groups
+      // Standard NA topic translation map for English UI
+      const STANDARD_TOPIC_EN_MAP: Record<string, string> = {
+        'خطوة أولى': 'Step 1',
+        'خطوة ثانية': 'Step 2',
+        'خطوة ثالثة': 'Step 3',
+        'خطوة رابعة': 'Step 4',
+        'خطوة خامسة': 'Step 5',
+        'خطوة سادسة': 'Step 6',
+        'خطوة سابعة': 'Step 7',
+        'خطوة ثامنة': 'Step 8',
+        'خطوة تاسعة': 'Step 9',
+        'خطوة عاشرة': 'Step 10',
+        'خطوة حادية عشرة': 'Step 11',
+        'خطوة ثانية عشرة': 'Step 12',
+        'الخطوات الاثنتا عشرة': 'The 12 Steps',
+        'الخطوات الاثنتي عشرة': 'The 12 Steps',
+        'الخطوات': 'The Steps',
+        'التقاليد الاثنا عشر': 'The 12 Traditions',
+        'التقاليد': 'The Traditions',
+        'المفاهيم الاثنا عشر': 'The 12 Concepts',
+        'المفاهيم': 'The Concepts',
+        'مفتوح': 'Open',
+        'مغلق': 'Closed',
+        'قراءة ومناقشة': 'Reading & Discussion',
+        'مناقشة موضوع': 'Topic Discussion',
+        'مشاركة حرة': 'Open Share',
+        'قراءة النص الأساسي': 'Basic Text Reading',
+        'النص الأساسي': 'Basic Text',
+        'لليوم فقط': 'Just For Today',
+        'جدد': 'Newcomers',
+        'أعضاء جدد': 'Newcomers',
+        'رجال': 'Men',
+        'سيدات': 'Women',
+        'اجتماع أعمال': 'Business Meeting',
+        'اجتماع خدمي': 'Service Meeting',
+      };
+
+      // 4. Groups & Map for meetings hydration
+      const groupLookupMap = new Map<string, any>();
       if (groupsRes.status === 'fulfilled') {
         const groups = extractArray(groupsRes.value);
         const col = database.get<Group>('groups');
         for (const item of groups) {
           if (!item?.id) continue;
+          groupLookupMap.set(String(item.id), item);
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
           const name = item.ar_name || item.en_name || item.name || '';
           const groupType = item.group_type || '';
@@ -158,16 +204,18 @@ export async function pullMasterData(): Promise<void> {
         for (const item of topics) {
           if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
+          const ar = item.ar_name || item.name_ar || item.name || '';
+          const en = item.en_name || item.name_en || STANDARD_TOPIC_EN_MAP[ar] || (ar && !/[\u0600-\u06FF]/.test(ar) ? ar : '');
           if (existing.length > 0) {
             await existing[0].update((t) => {
-              t.arName = item.ar_name || item.name_ar || t.arName;
-              t.enName = item.en_name || item.name_en || t.enName;
+              t.arName = ar || t.arName;
+              t.enName = en || t.enName;
             });
           } else {
             await col.create((t) => {
               t.remoteId = String(item.id);
-              t.arName = item.ar_name || item.name_ar || '';
-              t.enName = item.en_name || item.name_en || '';
+              t.arName = ar;
+              t.enName = en;
             });
           }
         }
@@ -195,7 +243,7 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 7. Meetings (Handles both nested group relation schema & flat fallbacks)
+      // 7. Meetings (Handles both nested group relation schema, groups lookup & flat fallbacks)
       if (meetingsRes.status === 'fulfilled') {
         const remoteMeetings = extractArray(meetingsRes.value);
         const col = database.get<Meeting>('meetings');
@@ -203,18 +251,20 @@ export async function pullMasterData(): Promise<void> {
           if (!item?.id) continue;
           const existing = await col.query(Q.where('remote_id', String(item.id))).fetch();
 
-          // Extract attributes considering both relation hierarchy and flat keys
+          // Extract attributes considering relation hierarchy, lookup map, and flat keys
           const groupObj = item.group || {};
-          const groupNeighborhood = groupObj.neighborhood || {};
-          const groupCity = groupNeighborhood.city || {};
+          const matchedGroup = item.group_id ? groupLookupMap.get(String(item.group_id)) : undefined;
+          const groupNeighborhood = groupObj.neighborhood || matchedGroup?.neighborhood || {};
+          const groupCity = groupNeighborhood.city || matchedGroup?.neighborhood?.city || {};
 
-          const groupNameAr = groupObj.ar_name || item.group_name_ar || '';
-          const groupNameEn = groupObj.en_name || item.group_name_en || '';
-          const groupType = groupObj.group_type || item.group_type || '';
-          const addressAr = groupObj.ar_address || item.address_ar || '';
-          const addressEn = groupObj.en_address || item.address_en || '';
+          const groupNameAr = groupObj.ar_name || matchedGroup?.ar_name || item.group_name_ar || '';
+          const groupNameEn = groupObj.en_name || matchedGroup?.en_name || item.group_name_en || '';
+          const groupType = groupObj.group_type || matchedGroup?.group_type || item.group_type || '';
+          const addressAr = groupObj.ar_address || matchedGroup?.ar_address || item.address_ar || '';
+          const addressEn = groupObj.en_address || matchedGroup?.en_address || item.address_en || '';
           const locationUrl =
             groupObj.location ||
+            matchedGroup?.location ||
             item.location ||
             item.location_url ||
             item.map_url ||
@@ -226,15 +276,62 @@ export async function pullMasterData(): Promise<void> {
           const neighborhoodNameAr = groupNeighborhood.ar_name || item.neighborhood_name_ar || '';
           const neighborhoodNameEn = groupNeighborhood.en_name || item.neighborhood_name_en || '';
 
-          // Format topic
-          let topicName = '';
+          // GSR Data Hydration
+          const gsrNameAr =
+            groupObj.ar_gsr_name ||
+            matchedGroup?.ar_gsr_name ||
+            item.ar_gsr_name ||
+            item.gsr_name_ar ||
+            '';
+          const gsrNameEn =
+            groupObj.en_gsr_name ||
+            matchedGroup?.en_gsr_name ||
+            item.en_gsr_name ||
+            item.gsr_name_en ||
+            '';
+          const gsrPhone =
+            groupObj.phone ||
+            matchedGroup?.phone ||
+            item.phone ||
+            item.gsr_phone ||
+            '';
+
+          // Format topics bilingual
+          let topicNameAr = '';
+          let topicNameEn = '';
+
           if (Array.isArray(item.topics) && item.topics.length > 0) {
-            topicName = item.topics.map((t: any) => t.ar_name || t.en_name || t.name || '').filter(Boolean).join(', ');
+            topicNameAr = item.topics
+              .map((t: any) => t.ar_name || t.name_ar || t.name || '')
+              .filter(Boolean)
+              .join(', ');
+            topicNameEn = item.topics
+              .map((t: any) => {
+                if (t.en_name) return t.en_name;
+                if (t.name_en) return t.name_en;
+                const ar = t.ar_name || t.name_ar || t.name || '';
+                return STANDARD_TOPIC_EN_MAP[ar] || (ar && !/[\u0600-\u06FF]/.test(ar) ? ar : '');
+              })
+              .filter(Boolean)
+              .join(', ');
           } else if (typeof item.topic === 'object' && item.topic !== null) {
-            topicName = item.topic.ar_name || item.topic.en_name || item.topic.name || '';
+            const t = item.topic;
+            topicNameAr = t.ar_name || t.name_ar || t.name || '';
+            topicNameEn =
+              t.en_name ||
+              t.name_en ||
+              STANDARD_TOPIC_EN_MAP[topicNameAr] ||
+              (topicNameAr && !/[\u0600-\u06FF]/.test(topicNameAr) ? topicNameAr : '');
           } else if (item.topic || item.topic_name || item.topic_ar || item.topic_en) {
-            topicName = String(item.topic || item.topic_name || item.topic_ar || item.topic_en);
+            topicNameAr = String(item.topic_ar || item.topic_name || item.topic || '');
+            topicNameEn = String(
+              item.topic_en ||
+                STANDARD_TOPIC_EN_MAP[topicNameAr] ||
+                (topicNameAr && !/[\u0600-\u06FF]/.test(topicNameAr) ? topicNameAr : '')
+            );
           }
+
+          const fallbackTopic = topicNameAr || topicNameEn;
 
           if (existing.length > 0) {
             await existing[0].update((m) => {
@@ -247,11 +344,16 @@ export async function pullMasterData(): Promise<void> {
               m.addressAr = addressAr || m.addressAr;
               m.addressEn = addressEn || m.addressEn;
               m.locationUrl = locationUrl || m.locationUrl;
-              m.topicName = topicName || m.topicName;
+              m.topicName = fallbackTopic || m.topicName;
+              m.topicNameAr = topicNameAr || m.topicNameAr;
+              m.topicNameEn = topicNameEn || m.topicNameEn;
               m.cityNameAr = cityNameAr || m.cityNameAr;
               m.cityNameEn = cityNameEn || m.cityNameEn;
               m.neighborhoodNameAr = neighborhoodNameAr || m.neighborhoodNameAr;
               m.neighborhoodNameEn = neighborhoodNameEn || m.neighborhoodNameEn;
+              m.gsrNameAr = gsrNameAr || m.gsrNameAr;
+              m.gsrNameEn = gsrNameEn || m.gsrNameEn;
+              m.gsrPhone = gsrPhone || m.gsrPhone;
               m.startTime = item.start_time ?? m.startTime;
               m.endTime = item.end_time ?? m.endTime;
               m.formattedStartTime = item.formatted_start_time ?? m.formattedStartTime;
@@ -276,11 +378,16 @@ export async function pullMasterData(): Promise<void> {
               m.addressAr = addressAr;
               m.addressEn = addressEn;
               m.locationUrl = locationUrl;
-              m.topicName = topicName;
+              m.topicName = fallbackTopic;
+              m.topicNameAr = topicNameAr;
+              m.topicNameEn = topicNameEn;
               m.cityNameAr = cityNameAr;
               m.cityNameEn = cityNameEn;
               m.neighborhoodNameAr = neighborhoodNameAr;
               m.neighborhoodNameEn = neighborhoodNameEn;
+              m.gsrNameAr = gsrNameAr;
+              m.gsrNameEn = gsrNameEn;
+              m.gsrPhone = gsrPhone;
               m.startTime = item.start_time || '';
               m.endTime = item.end_time || '';
               m.formattedStartTime = item.formatted_start_time || '';
@@ -297,7 +404,7 @@ export async function pullMasterData(): Promise<void> {
         }
       }
 
-      // 8. Events (Both /calendar-events, /events, and /home upcoming_events)
+      // 8. Events (Both /calendar-events and /home upcoming_events)
       const rawEvents: any[] = [];
       if (calendarEventsRes.status === 'fulfilled') {
         const calEvents = extractArray(calendarEventsRes.value);
@@ -307,12 +414,28 @@ export async function pullMasterData(): Promise<void> {
         const standardEvents = extractArray(eventsRes.value);
         rawEvents.push(...standardEvents);
       }
+      if (homeRes.status === 'fulfilled' && homeRes.value?.data?.data?.upcoming_events) {
+        const homeEvents = homeRes.value.data.data.upcoming_events;
+        if (Array.isArray(homeEvents)) {
+          rawEvents.push(...homeEvents);
+        }
+      }
 
       const eventsCol = database.get<Event>('events');
       for (const item of rawEvents) {
         if (!item?.id && !item?.remote_id && !item?.title && !item?.name) continue;
-        const remoteId = String(item.id || item.remote_id || Math.random().toString());
-        const existing = await eventsCol.query(Q.where('remote_id', remoteId)).fetch();
+        const start =
+          item.start ||
+          item.start_date ||
+          item.date ||
+          item.event_date ||
+          item.start_time ||
+          item.created_at ||
+          '';
+
+        const baseId = String(item.id || item.remote_id || Math.random().toString());
+        const occurrenceDate = start ? start.slice(0, 10) : '';
+        const remoteId = occurrenceDate && !baseId.includes('_') ? `${baseId}_${occurrenceDate}` : baseId;
 
         const title =
           item.title ||
@@ -331,14 +454,7 @@ export async function pullMasterData(): Promise<void> {
           item.content ||
           '';
 
-        const start =
-          item.start ||
-          item.start_date ||
-          item.date ||
-          item.event_date ||
-          item.start_time ||
-          item.created_at ||
-          '';
+        const existing = await eventsCol.query(Q.where('remote_id', remoteId)).fetch();
 
         const end =
           item.end ||

@@ -39,38 +39,38 @@ export const lightColors: ColorPalette = {
 };
 
 export const darkColors: ColorPalette = {
-  primary: '#2b4c7e',
+  primary: '#38bdf8',       // Light vibrant blue for dark mode accents
   primaryDark: '#0b1626',
   primaryLight: '#3b679e',
-  secondary: '#1e3a5f',
+  secondary: '#60a5fa',
   accent: '#22d3ee',        // Bright Cyan for dark mode
-  accentLight: 'rgba(34, 211, 238, 0.15)',
-  accentDark: '#0891b2',
+  accentLight: 'rgba(34, 211, 238, 0.18)',
+  accentDark: '#67e8f9',    // High-contrast cyan text for dark backgrounds
   gold: '#fbbf24',          // Bright Amber
-  goldLight: 'rgba(251, 191, 36, 0.15)',
-  goldDark: '#d97706',
+  goldLight: 'rgba(251, 191, 36, 0.18)',
+  goldDark: '#fde047',      // Bright legible gold on dark
   cardBg: '#1e293b',       // Slate 800 Surface
   cardElevated: '#334155',  // Slate 700
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  cardBorder: 'rgba(255, 255, 255, 0.12)',
   bgPrimary: '#0f172a',     // Slate 900 Background
   bgSecondary: '#1e293b',
   bgLight: '#1e293b',
   bgDark: '#020617',
   textPrimary: '#f8fafc',
-  textSecondary: '#cbd5e1',
-  textMuted: '#64748b',
+  textSecondary: '#cbd5e1', // High contrast secondary
+  textMuted: '#94a3b8',     // High contrast muted
   textInverse: '#0f172a',
-  border: 'rgba(255, 255, 255, 0.12)',
+  border: 'rgba(255, 255, 255, 0.15)',
   borderSolid: '#334155',
   borderSubtle: '#1e293b',
   success: '#34d399',
-  successLight: 'rgba(52, 211, 153, 0.15)',
+  successLight: 'rgba(52, 211, 153, 0.18)',
   warning: '#fbbf24',
-  warningLight: 'rgba(251, 191, 36, 0.15)',
+  warningLight: 'rgba(251, 191, 36, 0.18)',
   danger: '#f87171',
-  dangerLight: 'rgba(248, 113, 113, 0.15)',
+  dangerLight: 'rgba(248, 113, 113, 0.18)',
   info: '#60a5fa',
-  infoLight: 'rgba(96, 165, 250, 0.15)',
+  infoLight: 'rgba(96, 165, 250, 0.18)',
   white: '#ffffff',
   black: '#000000',
   overlay: 'rgba(0, 0, 0, 0.7)',

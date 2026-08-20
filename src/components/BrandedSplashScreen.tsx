@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { NALogo } from './NALogo';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
 import { colors } from '../theme';
 
 interface BrandedSplashScreenProps {
@@ -10,28 +9,28 @@ interface BrandedSplashScreenProps {
 
 export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFinish, isReady = true }) => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const badgeAnim = useRef(new Animated.Value(20)).current;
+  const badgeAnim = useRef(new Animated.Value(15)).current;
   const isAnimationStarted = useRef(false);
 
   useEffect(() => {
-    // Entrance animation sequence
+    // Smooth Entrance animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 6,
-        tension: 40,
+        friction: 7,
+        tension: 50,
         useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
         toValue: 1,
-        duration: 700,
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.timing(badgeAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 500,
         easing: Easing.out(Easing.back(1.5)),
         useNativeDriver: true,
       }),
@@ -45,13 +44,13 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
       isAnimationStarted.current = true;
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 350,
+        duration: 300,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         if (onFinish) onFinish();
       });
-    }, 300);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [isReady]);
@@ -68,11 +67,12 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
         ]}
       >
         <View style={styles.logoContainer}>
-          <NALogo size={110} />
+          <Image
+            source={require('../../assets/splash-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
-
-        <Text style={styles.titleAr}>زمالة المدمنين المجهولين في مصر</Text>
-        <Text style={styles.titleEn}>Narcotics Anonymous • Egypt</Text>
 
         <Animated.View
           style={[
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: '100%',
     height: '100%',
-    backgroundColor: '#11253e', // Deep Navy Dark matching website
+    backgroundColor: '#ffffff', // Clean white matching native splash for zero flicker
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999999,
@@ -111,61 +111,51 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
+    width: '100%',
   },
   logoContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+    height: 160,
   },
-  titleAr: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 6,
-    letterSpacing: 0.3,
-  },
-  titleEn: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(224, 248, 252, 0.85)',
-    textAlign: 'center',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+  logoImage: {
+    width: 280,
+    height: 140,
   },
   badge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginTop: 28,
-    backgroundColor: 'rgba(16, 179, 207, 0.12)',
+    marginTop: 20,
+    backgroundColor: 'rgba(30, 58, 95, 0.06)',
     paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(16, 179, 207, 0.3)',
+    borderColor: 'rgba(30, 58, 95, 0.15)',
   },
   badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10b3cf',
     marginLeft: 8,
   },
   badgeText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#1e3a5f',
+    fontWeight: '700',
   },
   footerInfo: {
     position: 'absolute',
-    bottom: -100,
+    bottom: -110,
   },
   footerUrl: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '700',
     letterSpacing: 1.5,
   },
 });
-

@@ -35,13 +35,48 @@ interface HelplineModalProps {
   onClose: () => void;
 }
 
+const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
+  {
+    region: 'Cairo & Giza',
+    region_ar: 'القاهرة والجيزة',
+    phones: ['+201006979198', '+201060933888'],
+    whatsapp: 'https://wa.me/201060933888',
+  },
+  {
+    region: 'Alexandria & North Coast',
+    region_ar: 'الإسكندرية والساحل الشمالي',
+    phones: ['+201006979198', '+201060933888'],
+    whatsapp: 'https://wa.me/201060933888',
+  },
+  {
+    region: 'Delta & Canal Cities',
+    region_ar: 'الدلتا ومدن القناة (طنطا، المنصورة، بورسعيد، السويس)',
+    phones: ['+201006979198', '+201060933888'],
+    whatsapp: 'https://wa.me/201060933888',
+  },
+  {
+    region: 'Upper Egypt & Red Sea',
+    region_ar: 'صعيد مصر والبحر الأحمر (أسيوط، سوهاج، الأقصر، أسوان، الغردقة)',
+    phones: ['+201006979198', '+201060933888'],
+    whatsapp: 'https://wa.me/201060933888',
+  },
+];
+
+const OFFICIAL_DEFAULT_SOCIAL: SocialLinks = {
+  facebook: 'https://www.facebook.com/OfficialNAEgyPage',
+  instagram: 'https://www.instagram.com/narcoticsanonymousegy',
+  tiktok: 'https://www.tiktok.com/@narcoticsanonymousegypt',
+  whatsapp: 'https://wa.me/201060933888',
+  email: 'pr@naegypt.org',
+};
+
 export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }) => {
   const { i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const { colors, borderRadius, shadows } = useAppTheme();
 
-  const [helplines, setHelplines] = useState<HelplineItem[]>([]);
-  const [socialLinks, setSocialLinks] = useState<SocialLinks | null>(null);
+  const [helplines, setHelplines] = useState<HelplineItem[]>(OFFICIAL_DEFAULT_HELPLINES);
+  const [socialLinks, setSocialLinks] = useState<SocialLinks | null>(OFFICIAL_DEFAULT_SOCIAL);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,10 +127,11 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
         }
       }
 
-      setHelplines(fetchedHelplines);
-      setSocialLinks(fetchedSocial);
+      setHelplines(fetchedHelplines.length > 0 ? fetchedHelplines : OFFICIAL_DEFAULT_HELPLINES);
+      setSocialLinks(fetchedSocial || OFFICIAL_DEFAULT_SOCIAL);
     } catch (err: any) {
-      setError(isAr ? 'تعذر جلب بيانات خطوط المساعدة من الخادم.' : 'Could not retrieve helpline data from server.');
+      setHelplines(OFFICIAL_DEFAULT_HELPLINES);
+      setSocialLinks(OFFICIAL_DEFAULT_SOCIAL);
     } finally {
       setIsLoading(false);
     }

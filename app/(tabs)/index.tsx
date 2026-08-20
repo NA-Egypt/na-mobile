@@ -1,505 +1,408 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  FlatList,
+  ScrollView,
   RefreshControl,
-  Platform,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { MapPinOff, Sparkles, PhoneCall } from 'lucide-react-native';
-import { database } from '../../src/database';
-import Meeting from '../../src/database/models/Meeting';
-import City from '../../src/database/models/City';
-import Day from '../../src/database/models/Day';
-import { MeetingCard } from '../../src/components/MeetingCard';
-import { FilterModal, FilterOptions } from '../../src/components/FilterModal';
+import {
+  Sparkles,
+  PhoneCall,
+  MapPin,
+  Calendar,
+  Users,
+  Compass,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  MessageCircle,
+  Clock,
+  ArrowUpRight,
+  HeartHandshake,
+} from 'lucide-react-native';
+import { AppText, Badge, AppHeader } from '../../src/components/ui';
 import { JftModal } from '../../src/components/JftModal';
 import { HelplineModal } from '../../src/components/HelplineModal';
-import { NALogo } from '../../src/components/NALogo';
-import {
-  AppText,
-  SearchBar,
-  FilterChips,
-  ActiveFilterItem,
-  EmptyState,
-  MeetingCardSkeleton,
-  LanguageSwitcher,
-} from '../../src/components/ui';
-import { ThemeToggle } from '../../src/components/ThemeToggle';
-import { pullMasterData } from '../../src/database/sync';
 import { homeApi } from '../../src/api/home';
-import { FrontpageStats } from '../../src/api/types';
+import { FrontpageStats, JftData, HelplineItem } from '../../src/api/types';
 import { useAppTheme } from '../../src/theme';
-import { useAppStore } from '../../src/store/appStore';
 import { haptic } from '../../src/utils/haptics';
-import { TouchableOpacity } from 'react-native';
 
-export default function MeetingFinderScreen() {
+export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const { colors, spacing, borderRadius } = useAppTheme();
+  const router = useRouter();
+  const { colors, spacing, borderRadius, shadows, isDark } = useAppTheme();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isJftVisible, setIsJftVisible] = useState(false);
   const [isHelplineVisible, setIsHelplineVisible] = useState(false);
-  const [frontpageStats, setFrontpageStats] = useState<FrontpageStats | null>(null);
 
-
-  const {
-    recentSearches,
-    addRecentSearch,
-    clearRecentSearches,
-    bookmarks,
-    toggleBookmark,
-  } = useAppStore();
-
-  const [filters, setFilters] = useState<FilterOptions>({
-    cityId: null,
-    dayId: null,
-    groupType: null,
-    lang: null,
-    type: null,
+  const [stats, setStats] = useState<FrontpageStats>({
+    weekly_meetings: 78,
+    groups: 35,
+    governorates: 9,
+    upcoming_events: 4,
   });
 
-  const [meetings, setMeetings] = useState<any[]>([]);
-  const [cities, setCities] = useState<Array<{ id: string; name: string }>>([]);
-  const [days, setDays] = useState<Array<{ id: string; name: string }>>([]);
+  const [jft, setJft] = useState<JftData>({
+    title: 'تأمل اليوم في التعافي',
+    date: new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+    quote: 'نحن لا نستطيع أن نغير من أين أتينا، ولكننا نستطيع أن نغير إلى أين نحن ذاهبون.',
+    quote_source: 'الكتاب الأساسي لزمالة NA',
+  });
 
-  const loadDataFromLocalDB = useCallback(async () => {
+  const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
+    {
+      region: 'Cairo & Giza',
+      region_ar: 'القاهرة والجيزة',
+      phones: ['+201006979198', '+201060933888'],
+      whatsapp: '+201060933888',
+    },
+    {
+      region: 'Alexandria & North Coast',
+      region_ar: 'الإسكندرية والساحل الشمالي',
+      phones: ['+201006979198', '+201060933888'],
+      whatsapp: '+201060933888',
+    },
+    {
+      region: 'Delta & Canal Cities',
+      region_ar: 'الدلتا ومدن القناة',
+      phones: ['+201006979198', '+201060933888'],
+      whatsapp: '+201060933888',
+    },
+    {
+      region: 'Upper Egypt & Red Sea',
+      region_ar: 'صعيد مصر والبحر الأحمر',
+      phones: ['+201006979198', '+201060933888'],
+      whatsapp: '+201060933888',
+    },
+  ];
+
+  const [helplines, setHelplines] = useState<HelplineItem[]>(OFFICIAL_DEFAULT_HELPLINES);
+
+  const loadHomeData = async () => {
     try {
-      const meetingsCollection = database.get<Meeting>('meetings');
-      const allMeetings = await meetingsCollection.query().fetch();
+      const [statsRes, jftRes, helplinesRes] = await Promise.allSettled([
+        homeApi.getStats(),
+        homeApi.getJft(),
+        homeApi.getHelplines(),
+      ]);
 
-      const citiesCollection = database.get<City>('cities');
-      const daysCollection = database.get<Day>('days');
-
-      const allCities = await citiesCollection.query().fetch();
-      const allDays = await daysCollection.query().fetch();
-
-      setCities(
-        allCities.map((c) => ({
-          id: c.remoteId || c.id,
-          name: isAr ? c.arName || c.enName || '' : c.enName || c.arName || '',
-        }))
-      );
-
-      setDays(
-        allDays.map((d) => ({
-          id: d.remoteId || d.id,
-          name: isAr ? d.arName || d.enName || '' : d.enName || d.arName || '',
-        }))
-      );
-
-      const populated = allMeetings.map((m) => {
-        const day = allDays.find(
-          (d) => String(d.remoteId) === String(m.dayId) || String(d.id) === String(m.dayId)
-        );
-
-        const groupName = isAr
-          ? m.groupNameAr || m.groupNameEn || 'اجتماع زمالة NA'
-          : m.groupNameEn || m.groupNameAr || 'NA Meeting';
-
-        const cityName = isAr
-          ? m.cityNameAr || m.cityNameEn || ''
-          : m.cityNameEn || m.cityNameAr || '';
-
-        const neighborhoodName = isAr
-          ? m.neighborhoodNameAr || m.neighborhoodNameEn || ''
-          : m.neighborhoodNameEn || m.neighborhoodNameAr || '';
-
-        const dayName = isAr
-          ? day?.arName || day?.enName || `يوم ${m.dayId}`
-          : day?.enName || day?.arName || `Day ${m.dayId}`;
-
-        return {
-          id: m.id,
-          remoteId: m.remoteId,
-          groupName,
-          groupType: m.groupType || 'in_person',
-          cityName,
-          neighborhoodName,
-          dayName,
-          dayId: String(m.dayId || ''),
-          startTime: m.formattedStartTime || m.startTime || '',
-          endTime: m.formattedEndTime || m.endTime || '',
-          address: isAr ? m.addressAr || m.addressEn || '' : m.addressEn || m.addressAr || '',
-          locationUrl: m.locationUrl || '',
-          topicName: m.topicName || '',
-          type: m.type || 'open',
-          lang: m.lang || 'arabic',
-          notes: m.notes || '',
-        };
-      });
-
-      setMeetings(populated);
+      if (statsRes.status === 'fulfilled' && statsRes.value) {
+        setStats((prev) => ({ ...prev, ...statsRes.value }));
+      }
+      if (jftRes.status === 'fulfilled' && jftRes.value) {
+        setJft(jftRes.value);
+      }
+      if (helplinesRes.status === 'fulfilled' && Array.isArray(helplinesRes.value) && helplinesRes.value.length > 0) {
+        setHelplines(helplinesRes.value);
+      }
     } catch (e) {
-      console.error('Error loading meetings:', e);
-    } finally {
-      setIsLoading(false);
+      // Keep resilient cached fallback
     }
-  }, [isAr]);
+  };
 
   useEffect(() => {
-    loadDataFromLocalDB();
-    pullMasterData().then(() => {
-      loadDataFromLocalDB();
-    });
-
-    homeApi
-      .getStats()
-      .then((st) => setFrontpageStats(st))
-      .catch(() => {});
-
-    const subscription = database
-      .get<Meeting>('meetings')
-      .query()
-      .observe()
-      .subscribe(() => {
-        loadDataFromLocalDB();
-      });
-
-    return () => subscription.unsubscribe();
-  }, [loadDataFromLocalDB]);
+    loadHomeData();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await Promise.allSettled([
-      pullMasterData(),
-      homeApi.getStats().then((st) => setFrontpageStats(st)),
-    ]);
-    await loadDataFromLocalDB();
+    await loadHomeData();
     setIsRefreshing(false);
   };
 
-
-  const handleSearchSubmit = (text: string) => {
-    setSearchQuery(text);
-    if (text.trim()) {
-      addRecentSearch(text.trim());
-    }
+  const handleCall = (phoneNumber: string) => {
+    haptic.selection();
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => {});
   };
 
-  // Filter calculation
-  const filteredMeetings = useMemo(() => {
-    return meetings.filter((m) => {
-      const query = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        query === '' ||
-        m.groupName.toLowerCase().includes(query) ||
-        m.cityName.toLowerCase().includes(query) ||
-        m.neighborhoodName.toLowerCase().includes(query) ||
-        m.address.toLowerCase().includes(query);
-
-      const matchesDay = !filters.dayId || String(m.dayId) === String(filters.dayId);
-
-      const matchesCity = (() => {
-        if (!filters.cityId) return true;
-        const selectedCity = cities.find((c) => c.id === filters.cityId);
-        if (!selectedCity) return true;
-        return (
-          m.cityName.toLowerCase().includes(selectedCity.name.toLowerCase()) ||
-          selectedCity.name.toLowerCase().includes(m.cityName.toLowerCase())
-        );
-      })();
-
-      const matchesGroupType = !filters.groupType || m.groupType === filters.groupType;
-
-      const matchesLang =
-        !filters.lang ||
-        m.lang === filters.lang ||
-        m.lang === 'both' ||
-        (filters.lang === 'arabic' && (m.lang === 'ar' || m.lang === 'arabic')) ||
-        (filters.lang === 'english' && (m.lang === 'en' || m.lang === 'english'));
-
-      const matchesType = !filters.type || m.type === filters.type;
-
-      return matchesSearch && matchesDay && matchesCity && matchesGroupType && matchesLang && matchesType;
-    });
-  }, [meetings, searchQuery, filters, cities]);
-
-  // Active filter items for chips
-  const activeFilterItems: ActiveFilterItem[] = useMemo(() => {
-    const list: ActiveFilterItem[] = [];
-
-    if (filters.dayId) {
-      const d = days.find((item) => String(item.id) === String(filters.dayId));
-      list.push({
-        key: 'dayId',
-        label: isAr ? 'اليوم' : 'Day',
-        value: d ? d.name : filters.dayId,
-      });
-    }
-
-    if (filters.cityId) {
-      const c = cities.find((item) => String(item.id) === String(filters.cityId));
-      list.push({
-        key: 'cityId',
-        label: isAr ? 'المدينة' : 'City',
-        value: c ? c.name : filters.cityId,
-      });
-    }
-
-    if (filters.groupType) {
-      const labels: Record<string, string> = {
-        in_person: isAr ? 'حضوري' : 'In-Person',
-        online: isAr ? 'أونلاين' : 'Online',
-        hybrid: isAr ? 'مختلط' : 'Hybrid',
-      };
-      list.push({
-        key: 'groupType',
-        label: isAr ? 'النوع' : 'Type',
-        value: labels[filters.groupType] || filters.groupType,
-      });
-    }
-
-    if (filters.lang) {
-      const labels: Record<string, string> = {
-        arabic: isAr ? 'عربي' : 'Arabic',
-        english: isAr ? 'إنجليزي' : 'English',
-        both: isAr ? 'عربي / إنجليزي' : 'Bilingual',
-      };
-      list.push({
-        key: 'lang',
-        label: isAr ? 'اللغة' : 'Lang',
-        value: labels[filters.lang] || filters.lang,
-      });
-    }
-
-    if (filters.type) {
-      const labels: Record<string, string> = {
-        open: isAr ? 'مفتوح' : 'Open',
-        closed: isAr ? 'مغلق' : 'Closed',
-      };
-      list.push({
-        key: 'type',
-        label: isAr ? 'الصفة' : 'Access',
-        value: labels[filters.type] || filters.type,
-      });
-    }
-
-    return list;
-  }, [filters, days, cities, isAr]);
-
-  const handleRemoveFilter = (key: string) => {
-    setFilters((prev) => ({ ...prev, [key]: null }));
+  const handleWhatsApp = (whatsappNumber: string) => {
+    haptic.selection();
+    const cleanNum = whatsappNumber.replace(/[^0-9]/g, '');
+    Linking.openURL(`https://wa.me/2${cleanNum}`).catch(() => {});
   };
-
-  const handleClearAllFilters = () => {
-    setFilters({
-      cityId: null,
-      dayId: null,
-      groupType: null,
-      lang: null,
-      type: null,
-    });
-  };
-
-  const renderMeetingItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
-      <MeetingCard
-        meetingId={item.id}
-        groupName={item.groupName}
-        cityName={item.cityName}
-        neighborhoodName={item.neighborhoodName}
-        dayName={item.dayName}
-        startTime={item.startTime}
-        endTime={item.endTime}
-        type={item.type}
-        lang={item.lang}
-        notes={item.notes}
-        locationUrl={item.locationUrl}
-        topicName={item.topicName}
-        isBookmarked={!!bookmarks[item.id]}
-        onToggleBookmark={toggleBookmark}
-        index={index}
-      />
-    ),
-    [bookmarks, toggleBookmark]
-  );
 
   return (
-    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
-      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
-        {/* Brand Header */}
-        <View style={styles.brandHeader}>
-          <View style={styles.brandLeft}>
-            <NALogo size={40} />
-            <View style={styles.brandTitleContainer}>
-              <AppText variant="h3" color="#ffffff" weight="800" style={styles.brandTitleAr}>
-                زمالة المدمنين المجهولين
+    <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
+      <AppHeader
+        title={isAr ? 'زمالة المدمنين المجهولين' : 'Narcotics Anonymous'}
+        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • Official Fellowship'}
+      />
+
+      <ScrollView
+        style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.accent, colors.primary]}
+            tintColor={colors.accent}
+          />
+        }
+      >
+        {/* Welcome Banner */}
+        <View style={[styles.welcomeCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <View style={styles.welcomeHeader}>
+            <View style={[styles.welcomeIconWrapper, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight }]}>
+              <HeartHandshake size={24} color={isDark ? '#22d3ee' : colors.accentDark} />
+            </View>
+            <View style={styles.welcomeTextCol}>
+              <AppText variant="h2" color={colors.textPrimary} weight="800">
+                {isAr ? 'أهلاً بك في زمالة NA مصر' : 'Welcome to NA Egypt'}
               </AppText>
-              <AppText variant="caption" color="rgba(224, 248, 252, 0.8)" style={styles.brandTitleEn}>
-                Narcotics Anonymous • Egypt
+              <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 2 }}>
+                {isAr
+                  ? 'أي مدمن يمكنه التوقف عن التعاطي وفقدان الرغبة وإيجاد طريقة جديدة للحياة.'
+                  : 'Any addict can stop using, lose the desire to use, and find a new way to live.'}
               </AppText>
             </View>
           </View>
-
-          <View style={styles.headerRightActions}>
-            <ThemeToggle />
-            <LanguageSwitcher />
-          </View>
         </View>
 
-        {/* Quick Access Actions Bar: Just For Today Reading & Emergency Helplines */}
-        <View style={styles.quickActionsRow}>
+        {/* Live Fellowship Stats Grid */}
+        <View style={styles.sectionHeader}>
+          <AppText variant="h3" color={colors.textPrimary} weight="800">
+            {isAr ? 'إحصائيات وخدمات الزمالة' : 'Fellowship Overview'}
+          </AppText>
+          <Badge label={isAr ? 'مباشر' : 'Live'} variant="accent" size="sm" />
+        </View>
+
+        <View style={styles.statsGrid}>
+          {/* Stat 1: Weekly Meetings */}
           <TouchableOpacity
-            style={[styles.quickActionBtn, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}
+            style={[styles.statCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/meetings');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : colors.primaryLight + '20' }]}>
+              <Clock size={20} color={isDark ? '#38bdf8' : colors.primary} />
+            </View>
+            <AppText variant="h1" color={isDark ? '#38bdf8' : colors.primary} weight="800" style={styles.statNumber}>
+              {stats.weekly_meetings || stats.total_meetings || '75+'}
+            </AppText>
+            <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
+              {isAr ? 'اجتماع أسبوعي' : 'Weekly Meetings'}
+            </AppText>
+          </TouchableOpacity>
+
+          {/* Stat 2: Active Groups */}
+          <TouchableOpacity
+            style={[styles.statCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/meetings');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.18)' : colors.accentLight }]}>
+              <Users size={20} color={isDark ? '#22d3ee' : colors.accentDark} />
+            </View>
+            <AppText variant="h1" color={isDark ? '#22d3ee' : colors.accentDark} weight="800" style={styles.statNumber}>
+              {stats.groups || stats.total_groups || '35+'}
+            </AppText>
+            <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
+              {isAr ? 'مجموعة نشطة' : 'Active Groups'}
+            </AppText>
+          </TouchableOpacity>
+
+          {/* Stat 3: Governorates Covered */}
+          <View style={[styles.statCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.18)' : colors.goldLight }]}>
+              <Compass size={20} color={isDark ? '#fbbf24' : colors.goldDark} />
+            </View>
+            <AppText variant="h1" color={isDark ? '#fbbf24' : colors.goldDark} weight="800" style={styles.statNumber}>
+              {stats.governorates || stats.cities || '9+'}
+            </AppText>
+            <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
+              {isAr ? 'محافظات مغطاة' : 'Governorates'}
+            </AppText>
+          </View>
+
+          {/* Stat 4: Upcoming Events */}
+          <TouchableOpacity
+            style={[styles.statCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/events');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.18)' : colors.successLight }]}>
+              <Calendar size={20} color={isDark ? '#34d399' : colors.success} />
+            </View>
+            <AppText variant="h1" color={isDark ? '#34d399' : colors.success} weight="800" style={styles.statNumber}>
+              {stats.upcoming_events || '4+'}
+            </AppText>
+            <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
+              {isAr ? 'فعاليات قادمة' : 'Upcoming Events'}
+            </AppText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Action Navigation Cards */}
+        <View style={styles.quickLinksRow}>
+          <TouchableOpacity
+            style={[styles.quickLinkCard, { backgroundColor: isDark ? colors.cardElevated : colors.primaryDark }]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/meetings');
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={styles.quickLinkContent}>
+              <MapPin size={22} color="#ffffff" style={{ marginEnd: 10 }} />
+              <View>
+                <AppText variant="label" color="#ffffff" weight="800">
+                  {isAr ? 'البحث عن اجتماع الآن' : 'Find a Meeting Now'}
+                </AppText>
+                <AppText variant="caption" color="rgba(224, 248, 252, 0.85)">
+                  {isAr ? 'حسب اليوم والمحافظة والمنطقة' : 'By day, city & location'}
+                </AppText>
+              </View>
+            </View>
+            <ArrowUpRight size={18} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Just For Today (لليوم فقط) Card */}
+        <View style={[styles.jftCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <View style={styles.jftHeader}>
+            <View style={styles.jftTitleRow}>
+              <View style={[styles.jftIconCircle, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.2)' : colors.goldLight }]}>
+                <Sparkles size={18} color={isDark ? '#fbbf24' : colors.goldDark} />
+              </View>
+              <View style={{ marginStart: 10 }}>
+                <AppText variant="h3" color={colors.textPrimary} weight="800">
+                  {isAr ? 'لليوم فقط • تأمل التعافي' : 'Just For Today • Daily Reflection'}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted}>
+                  {jft.date || jft.page_date || 'تأمل اليوم'}
+                </AppText>
+              </View>
+            </View>
+            <Badge label={isAr ? 'يومي' : 'Daily'} variant="gold" size="sm" />
+          </View>
+
+          <View style={[styles.jftQuoteBox, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid }]}>
+            <AppText variant="h3" color={isDark ? '#38bdf8' : colors.primary} weight="700" style={{ marginBottom: 6 }}>
+              {jft.title || (isAr ? 'تأمل اليوم في التعافي' : 'Daily Reflection')}
+            </AppText>
+            <AppText variant="body" color={colors.textPrimary} style={styles.jftQuoteText}>
+              "{jft.quote || jft.thought_for_the_day || 'نحن نعيش التعافي يوماً بيوم.'}"
+            </AppText>
+            {jft.quote_source ? (
+              <AppText variant="caption" color={colors.textMuted} weight="600" style={{ marginTop: 6 }}>
+                — {jft.quote_source}
+              </AppText>
+            ) : null}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.jftActionBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight }]}
             onPress={() => {
               haptic.selection();
               setIsJftVisible(true);
             }}
             activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Just For Today"
           >
-            <Sparkles size={14} color={colors.accent} style={{ marginEnd: 6 }} />
-            <AppText variant="labelSmall" color="#ffffff" weight="700">
-              {isAr ? 'لليوم فقط' : 'Just For Today'}
+            <Sparkles size={15} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: 6 }} />
+            <AppText variant="label" color={isDark ? '#22d3ee' : colors.accentDark} weight="700">
+              {isAr ? 'قراءة التأمل كاملاً' : 'Read Full Reflection'}
             </AppText>
           </TouchableOpacity>
+        </View>
 
+        {/* Helplines Section (خطوط المساعدة) */}
+        <View style={styles.sectionHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <PhoneCall size={18} color={isDark ? '#22d3ee' : colors.accentDark} />
+            <AppText variant="h3" color={colors.textPrimary} weight="800">
+              {isAr ? 'خطوط المساعدة في مصر' : 'Regional Helplines'}
+            </AppText>
+          </View>
           <TouchableOpacity
-            style={[styles.quickActionBtn, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}
             onPress={() => {
               haptic.selection();
               setIsHelplineVisible(true);
             }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Helplines"
           >
-            <PhoneCall size={13} color={colors.accent} style={{ marginEnd: 6 }} />
-            <AppText variant="labelSmall" color="#ffffff" weight="700">
-              {isAr ? 'خطوط المساعدة' : 'Helplines'}
+            <AppText variant="labelSmall" color={isDark ? '#22d3ee' : colors.accentDark} weight="700">
+              {isAr ? 'عرض الكل' : 'View All'}
             </AppText>
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar & Filter Trigger */}
-        <View style={styles.searchSection}>
-          <SearchBar
-            query={searchQuery}
-            onChangeQuery={setSearchQuery}
-            placeholder={t('meetings.search_placeholder')}
-            onFilterPress={() => setIsFilterVisible(true)}
-            activeFilterCount={activeFilterItems.length}
-            recentSearches={recentSearches}
-            onSelectRecentSearch={(term) => {
-              setSearchQuery(term);
-              addRecentSearch(term);
-            }}
-            onClearRecentSearches={clearRecentSearches}
-          />
-        </View>
-
-        {/* Active Filter Chips */}
-        {activeFilterItems.length > 0 && (
-          <FilterChips
-            items={activeFilterItems}
-            onRemoveItem={handleRemoveFilter}
-            onClearAll={handleClearAllFilters}
-            style={styles.filterChipsRow}
-          />
-        )}
-      </SafeAreaView>
-
-      {/* Content Body */}
-      <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
-        {/* Results Header */}
-        <View style={styles.resultsHeaderRow}>
-          <AppText variant="label" color={colors.primary} weight="700">
-            {isAr
-              ? `${filteredMeetings.length} اجتماع متاح${
-                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
-                }`
-              : `${filteredMeetings.length} meetings found${
-                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
-                }`}
-          </AppText>
-          {activeFilterItems.length > 0 && (
-            <AppText
-              variant="labelSmall"
-              color={colors.accentDark}
-              weight="700"
-              onPress={handleClearAllFilters}
-              style={{ paddingVertical: 2, paddingHorizontal: 6 }}
+        <View style={styles.helplineList}>
+          {helplines.slice(0, 3).map((item, idx) => (
+            <View
+              key={idx}
+              style={[styles.helplineCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
             >
-              {isAr ? 'إلغاء كل التصفية' : 'Clear Filters'}
-            </AppText>
-          )}
+              <View style={styles.helplineInfo}>
+                <AppText variant="body" color={colors.textPrimary} weight="700">
+                  {isAr ? item.region_ar || item.region : item.region || item.region_ar}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted}>
+                  {isAr ? 'متاح للرد والدعم على مدار الساعة' : 'Available for fellowship support'}
+                </AppText>
+              </View>
+
+              <View style={styles.helplineActions}>
+                {item.phones && item.phones.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.2)' : colors.successLight }]}
+                    onPress={() => handleCall(item.phones[0])}
+                    activeOpacity={0.8}
+                  >
+                    <Phone size={14} color={isDark ? '#34d399' : colors.success} style={{ marginEnd: 4 }} />
+                    <AppText variant="caption" color={isDark ? '#34d399' : colors.success} weight="700">
+                      {item.phones[0]}
+                    </AppText>
+                  </TouchableOpacity>
+                )}
+
+                {item.whatsapp && (
+                  <TouchableOpacity
+                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.2)' : colors.accentLight }]}
+                    onPress={() => handleWhatsApp(item.whatsapp!)}
+                    activeOpacity={0.8}
+                  >
+                    <MessageCircle size={14} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: 4 }} />
+                    <AppText variant="caption" color={isDark ? '#22d3ee' : colors.accentDark} weight="700">
+                      WhatsApp
+                    </AppText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ))}
         </View>
+      </ScrollView>
 
-        {/* List / Loading / Empty State */}
-        {isLoading ? (
-          <View style={{ paddingTop: 8 }}>
-            <MeetingCardSkeleton />
-            <MeetingCardSkeleton />
-            <MeetingCardSkeleton />
-          </View>
-        ) : (
-          <FlatList
-            data={filteredMeetings}
-            keyExtractor={(item) => item.id || item.remoteId}
-            contentContainerStyle={styles.listContainer}
-            initialNumToRender={8}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            removeClippedSubviews={Platform.OS === 'android'}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                colors={[colors.accent, colors.primary]}
-                tintColor={colors.accent}
-              />
-            }
-            renderItem={renderMeetingItem}
-            ListEmptyComponent={
-              <EmptyState
-                icon={<MapPinOff size={44} color={colors.accent} />}
-                title={t('meetings.no_results')}
-                description={
-                  activeFilterItems.length > 0
-                    ? isAr
-                      ? 'لا توجد اجتماعات تطابق الفلاتر المحددة. جرب إزالة بعض الفلاتر أو تغيير كلمة البحث.'
-                      : 'No meetings match your selected filters. Try removing some filters or changing search keywords.'
-                    : isAr
-                      ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
-                      : 'No meetings found matching your search.'
-                }
-                primaryActionTitle={activeFilterItems.length > 0 ? (isAr ? 'إلغاء الفلاتر' : 'Clear Filters') : undefined}
-                onPrimaryAction={activeFilterItems.length > 0 ? handleClearAllFilters : undefined}
-                secondaryActionTitle={searchQuery ? (isAr ? 'مسح البحث' : 'Clear Search') : undefined}
-                onSecondaryAction={searchQuery ? () => setSearchQuery('') : undefined}
-              />
-            }
-          />
-        )}
-      </View>
-
-      {/* Filter Bottom Sheet */}
-      <FilterModal
-        visible={isFilterVisible}
-        onClose={() => setIsFilterVisible(false)}
-        filters={filters}
-        onApplyFilters={setFilters}
-        cities={cities}
-        days={days}
-      />
-
-      {/* Daily Spiritual Reflection Modal (Just For Today) */}
+      {/* Just For Today Modal */}
       <JftModal
         visible={isJftVisible}
         onClose={() => setIsJftVisible(false)}
       />
 
-      {/* Regional Helplines & Official Social Channels Modal */}
+      {/* Regional Helplines Modal */}
       <HelplineModal
         visible={isHelplineVisible}
         onClose={() => setIsHelplineVisible(false)}
@@ -512,78 +415,156 @@ const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
   },
-  safeHeader: {
-    paddingBottom: 4,
-  },
-  brandHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  quickActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-  },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  brandTitleContainer: {
-    marginStart: 10,
-  },
-  brandTitleAr: {
-    fontSize: 15,
-  },
-  brandTitleEn: {
-    fontSize: 10,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  searchSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  filterChipsRow: {
-    paddingBottom: 4,
-  },
   contentBody: {
     flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
   },
-  resultsHeaderRow: {
+  scrollContent: {
+    padding: 16,
+    paddingTop: 18,
+    paddingBottom: 32,
+  },
+  welcomeCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 18,
+  },
+  welcomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  welcomeIconWrapper: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginEnd: 12,
+  },
+  welcomeTextCol: {
+    flex: 1,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
+    marginBottom: 12,
+    marginTop: 6,
   },
-  listContainer: {
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    width: '48%',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+  },
+  statIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  statLabel: {
+    marginTop: 2,
+  },
+  quickLinksRow: {
+    marginBottom: 18,
+  },
+  quickLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
-    paddingTop: 6,
+    borderRadius: 14,
+  },
+  quickLinkContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  jftCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 18,
+  },
+  jftHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  jftTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  jftIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jftQuoteBox: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  jftQuoteText: {
+    lineHeight: 22,
+    fontStyle: 'italic',
+  },
+  jftActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  helplineList: {
+    gap: 10,
+  },
+  helplineCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  helplineInfo: {
+    flex: 1,
+    minWidth: 140,
+  },
+  helplineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  helplineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
 });
-

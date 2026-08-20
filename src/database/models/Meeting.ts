@@ -24,10 +24,15 @@ export default class Meeting extends Model {
   @text('address_en') addressEn?: string;
   @text('location_url') locationUrl?: string;
   @text('topic_name') topicName?: string;
+  @text('topic_name_ar') topicNameAr?: string;
+  @text('topic_name_en') topicNameEn?: string;
   @text('city_name_ar') cityNameAr?: string;
   @text('city_name_en') cityNameEn?: string;
   @text('neighborhood_name_ar') neighborhoodNameAr?: string;
   @text('neighborhood_name_en') neighborhoodNameEn?: string;
+  @text('gsr_name_ar') gsrNameAr?: string;
+  @text('gsr_name_en') gsrNameEn?: string;
+  @text('gsr_phone') gsrPhone?: string;
   @text('start_time') startTime?: string;
   @text('end_time') endTime?: string;
   @text('formatted_start_time') formattedStartTime?: string;

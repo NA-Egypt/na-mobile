@@ -22,7 +22,7 @@ export const Badge: React.FC<BadgeProps> = ({
   style,
   textStyle,
 }) => {
-  const { colors, borderRadius, typography } = useAppTheme();
+  const { colors, borderRadius, isDark } = useAppTheme();
 
   let bgColor = colors.bgSecondary;
   let textColor = colors.textSecondary;
@@ -30,16 +30,16 @@ export const Badge: React.FC<BadgeProps> = ({
 
   switch (variant) {
     case 'primary':
-      bgColor = colors.primaryLight + '20';
-      textColor = colors.primary;
+      bgColor = isDark ? 'rgba(56, 189, 248, 0.18)' : colors.primaryLight + '20';
+      textColor = isDark ? '#38bdf8' : colors.primary;
       break;
     case 'accent':
       bgColor = colors.accentLight;
-      textColor = colors.accentDark;
+      textColor = isDark ? '#22d3ee' : colors.accentDark;
       break;
     case 'gold':
       bgColor = colors.goldLight;
-      textColor = colors.goldDark;
+      textColor = isDark ? '#fbbf24' : colors.goldDark;
       break;
     case 'success':
       bgColor = colors.successLight;
@@ -47,7 +47,7 @@ export const Badge: React.FC<BadgeProps> = ({
       break;
     case 'warning':
       bgColor = colors.warningLight;
-      textColor = colors.warning;
+      textColor = isDark ? '#fbbf24' : colors.warning;
       break;
     case 'danger':
       bgColor = colors.dangerLight;

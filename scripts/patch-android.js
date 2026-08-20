@@ -113,10 +113,7 @@ if (fs.existsSync(wdbBridge)) {
 // 6. Recursively find and patch all graphicsConversions.h files
 try {
   const searchDirs = [
-    path.join(os.homedir(), '.gradle', 'caches', '9.4.1', 'transforms'),
-    path.join(os.homedir(), '.gradle', 'caches', 'transforms-4'),
-    path.join(os.homedir(), '.gradle', 'caches', 'transforms-3'),
-    path.join(os.homedir(), '.gradle', 'caches', 'modules-2', 'files-2.1', 'com.facebook.react'),
+    path.join(os.homedir(), '.gradle', 'caches'),
     path.join(process.cwd(), 'node_modules', 'react-native'),
     path.join(process.cwd(), 'android'),
   ];

@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -31,6 +32,14 @@ import {
   DownloadCloud,
   Layers,
   RefreshCw,
+  UserCheck,
+  Coins,
+  HeartHandshake,
+  UserPlus,
+  ExternalLink,
+  HelpCircle,
+  AlertCircle,
+  MessageSquare,
 } from 'lucide-react-native';
 import { authApi, UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
@@ -42,9 +51,8 @@ import {
   AppButton,
   EmptyState,
   Skeleton,
-  LanguageSwitcher,
+  AppHeader,
 } from '../../src/components/ui';
-import { ThemeToggle } from '../../src/components/ThemeToggle';
 import { haptic } from '../../src/utils/haptics';
 
 type AgendaTabType = 'groups' | 'service_bodies' | 'committees_archive';
@@ -53,7 +61,7 @@ export default function AgendasScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const router = useRouter();
-  const { colors, borderRadius, shadows } = useAppTheme();
+  const { colors, borderRadius, shadows, isDark } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<AgendaTabType>('groups');
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -193,121 +201,104 @@ export default function AgendasScreen() {
     await fetchAllData();
   };
 
-  const currentList =
+  const currentList = (
     activeTab === 'groups'
       ? groupAgendas
       : activeTab === 'service_bodies'
         ? serviceBodyAgendas
-        : committeeReports;
+        : committeeReports
+  ).filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'));
 
   return (
-    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
-      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
-        {/* Header Banner */}
-        <View style={styles.headerBanner}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight + '40' }]}>
-            <Layers size={20} color={colors.accent} />
-          </View>
-          <View style={styles.headerTextCol}>
-            <AppText variant="h3" color="#ffffff" weight="800">
-              {isAr ? 'جداول الأعمال والأرشيف الخدمي' : 'Agendas & Service Archive'}
-            </AppText>
-            <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
-              {isAr
-                ? 'أجندات المجموعات، الهيئات، وأرشيف تقارير اللجان الفرعية'
-                : 'Group Agendas, Service Bodies & Committee Archive'}
-            </AppText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle />
-            <LanguageSwitcher />
-          </View>
-        </View>
-
-        {/* 3-Tab Segmented Selector */}
-        <View style={styles.tabSelectorWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabSelectorContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.tabButton,
-                activeTab === 'groups' && [styles.tabButtonActive, { backgroundColor: colors.cardBg }],
-              ]}
-              onPress={() => {
-                haptic.selection();
-                setActiveTab('groups');
-              }}
-              activeOpacity={0.8}
+    <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
+      <AppHeader
+        title={isAr ? 'جداول الأعمال والأرشيف' : 'Agendas & Reports'}
+        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • Service Archive'}
+        bottomSlot={
+          <View style={styles.tabSelectorWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabSelectorContainer}
             >
-              <FileText
-                size={14}
-                color={activeTab === 'groups' ? colors.primary : '#ffffff'}
-                style={{ marginEnd: 6 }}
-              />
-              <AppText
-                variant="label"
-                color={activeTab === 'groups' ? colors.primary : '#ffffff'}
-                weight="700"
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  activeTab === 'groups' && [styles.tabButtonActive, { backgroundColor: isDark ? colors.cardBg : '#ffffff' }],
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setActiveTab('groups');
+                }}
+                activeOpacity={0.8}
               >
-                {isAr ? 'أجندات المجموعات' : 'Group Agendas'}
-              </AppText>
-            </TouchableOpacity>
+                <FileText
+                  size={14}
+                  color={activeTab === 'groups' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  style={{ marginEnd: 6 }}
+                />
+                <AppText
+                  variant="label"
+                  color={activeTab === 'groups' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  weight="700"
+                >
+                  {isAr ? 'أجندات المجموعات' : 'Group Agendas'}
+                </AppText>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.tabButton,
-                activeTab === 'service_bodies' && [styles.tabButtonActive, { backgroundColor: colors.cardBg }],
-              ]}
-              onPress={() => {
-                haptic.selection();
-                setActiveTab('service_bodies');
-              }}
-              activeOpacity={0.8}
-            >
-              <Building2
-                size={14}
-                color={activeTab === 'service_bodies' ? colors.primary : '#ffffff'}
-                style={{ marginEnd: 6 }}
-              />
-              <AppText
-                variant="label"
-                color={activeTab === 'service_bodies' ? colors.primary : '#ffffff'}
-                weight="700"
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  activeTab === 'service_bodies' && [styles.tabButtonActive, { backgroundColor: isDark ? colors.cardBg : '#ffffff' }],
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setActiveTab('service_bodies');
+                }}
+                activeOpacity={0.8}
               >
-                {isAr ? 'الهيئات الخدمية' : 'Service Bodies'}
-              </AppText>
-            </TouchableOpacity>
+                <Building2
+                  size={14}
+                  color={activeTab === 'service_bodies' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  style={{ marginEnd: 6 }}
+                />
+                <AppText
+                  variant="label"
+                  color={activeTab === 'service_bodies' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  weight="700"
+                >
+                  {isAr ? 'الهيئات الخدمية' : 'Service Bodies'}
+                </AppText>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.tabButton,
-                activeTab === 'committees_archive' && [styles.tabButtonActive, { backgroundColor: colors.cardBg }],
-              ]}
-              onPress={() => {
-                haptic.selection();
-                setActiveTab('committees_archive');
-              }}
-              activeOpacity={0.8}
-            >
-              <FileArchive
-                size={14}
-                color={activeTab === 'committees_archive' ? colors.primary : '#ffffff'}
-                style={{ marginEnd: 6 }}
-              />
-              <AppText
-                variant="label"
-                color={activeTab === 'committees_archive' ? colors.primary : '#ffffff'}
-                weight="700"
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  activeTab === 'committees_archive' && [styles.tabButtonActive, { backgroundColor: isDark ? colors.cardBg : '#ffffff' }],
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setActiveTab('committees_archive');
+                }}
+                activeOpacity={0.8}
               >
-                {isAr ? 'أرشيف اللجان' : 'Committees Archive'}
-              </AppText>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </SafeAreaView>
+                <FileArchive
+                  size={14}
+                  color={activeTab === 'committees_archive' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  style={{ marginEnd: 6 }}
+                />
+                <AppText
+                  variant="label"
+                  color={activeTab === 'committees_archive' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
+                  weight="700"
+                >
+                  {isAr ? 'أرشيف اللجان' : 'Committees Archive'}
+                </AppText>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        }
+      />
 
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
         {/* User Auth Status Bar */}
@@ -522,10 +513,13 @@ export default function AgendasScreen() {
               />
             }
             renderItem={({ item }) => {
+              if (!item || typeof item !== 'object') return null;
+
               if (activeTab === 'groups') {
                 const dateStr = item.agenda_date || item.created_at || '';
                 const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
                 const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
+                const groupTitle = item.group?.ar_name || item.group?.en_name || item.group_name || (isAr ? `مجموعة #${item.group_id || item.id}` : `Group #${item.group_id || item.id}`);
 
                 return (
                   <View
@@ -552,7 +546,7 @@ export default function AgendasScreen() {
                     </View>
 
                     <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.itemTitle}>
-                      {isAr ? `جدول أعمال مجموعة #${item.group_id || item.id}` : `Group Agenda #${item.group_id || item.id}`}
+                      {groupTitle}
                     </AppText>
 
                     <View style={styles.infoRow}>
@@ -571,8 +565,26 @@ export default function AgendasScreen() {
                       </View>
                     ) : null}
 
+                    {item.new_comers !== undefined && item.new_comers !== null ? (
+                      <View style={styles.infoRow}>
+                        <UserPlus size={14} color={colors.accentDark} style={{ marginEnd: 6 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                          {isAr ? `متوسط الجدد: ${item.new_comers}` : `Newcomers: ${item.new_comers}`}
+                        </AppText>
+                      </View>
+                    ) : null}
+
+                    {item.next_business_meeting ? (
+                      <View style={styles.infoRow}>
+                        <Calendar size={14} color={colors.success} style={{ marginEnd: 6 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                          {isAr ? `اجتماع الأعمال القادم: ${String(item.next_business_meeting).slice(0, 10)}` : `Next Business Mtg: ${String(item.next_business_meeting).slice(0, 10)}`}
+                        </AppText>
+                      </View>
+                    ) : null}
+
                     <AppButton
-                      title={isAr ? 'عرض التفاصيل الكاملة' : 'View Details'}
+                      title={isAr ? 'عرض جدول الأعمال كاملاً' : 'View Full Agenda'}
                       onPress={() => {
                         haptic.selection();
                         setSelectedItem({ ...item, modalType: 'group' });
@@ -588,6 +600,7 @@ export default function AgendasScreen() {
                 const title = item.title || item.name || (isAr ? 'جدول أعمال هيئة خدمية' : 'Service Body Agenda');
                 const sbName = item.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee');
                 const isApproved = item.status === 'approved';
+                const dateStr = item.meeting_date || item.agenda_date || item.created_at || '';
 
                 return (
                   <View
@@ -607,9 +620,9 @@ export default function AgendasScreen() {
                         variant={isApproved ? 'success' : 'warning'}
                         size="sm"
                       />
-                      {item.created_at ? (
+                      {dateStr ? (
                         <AppText variant="caption" color={colors.textMuted}>
-                          {item.created_at.slice(0, 10)}
+                          {dateStr.slice(0, 10)}
                         </AppText>
                       ) : null}
                     </View>
@@ -625,8 +638,17 @@ export default function AgendasScreen() {
                       </AppText>
                     </View>
 
+                    {item.questions && Array.isArray(item.questions) && item.questions.length > 0 ? (
+                      <View style={styles.infoRow}>
+                        <HelpCircle size={14} color={colors.accentDark} style={{ marginEnd: 6 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                          {isAr ? `${item.questions.length} بنود / أسئلة للتصويت` : `${item.questions.length} Voting Items/Questions`}
+                        </AppText>
+                      </View>
+                    ) : null}
+
                     <AppButton
-                      title={isAr ? 'عرض محضر الاجتماع' : 'View Minutes'}
+                      title={isAr ? 'عرض جدول الأعمال ومحضر الاجتماع' : 'View Agenda & Minutes'}
                       onPress={() => {
                         haptic.selection();
                         setSelectedItem({ ...item, modalType: 'service_body' });
@@ -639,9 +661,10 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else {
-                const title = item.title || item.name || (isAr ? 'تقرير لجنة فرعية' : 'Committee Report');
-                const committeeName = item.committee_name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee');
-                const isApproved = item.status === 'approved';
+                const title = item?.title || item?.name || (isAr ? 'تقرير لجنة فرعية' : 'Committee Report');
+                const committeeName = item?.committee_name || item?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee');
+                const isApproved = item?.status === 'approved';
+                const period = item?.period || item?.report_date || (item?.created_at ? String(item.created_at).slice(0, 10) : '');
 
                 return (
                   <View
@@ -668,8 +691,17 @@ export default function AgendasScreen() {
                       {title}
                     </AppText>
 
-                    {item.description ? (
-                      <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4, marginBottom: 6 }}>
+                    {period ? (
+                      <View style={styles.infoRow}>
+                        <Calendar size={14} color={colors.primary} style={{ marginEnd: 6 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                          {isAr ? `الفترة / التاريخ: ${period}` : `Period: ${period}`}
+                        </AppText>
+                      </View>
+                    ) : null}
+
+                    {item?.description ? (
+                      <AppText variant="bodySmall" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 4, marginBottom: 6 }}>
                         {item.description}
                       </AppText>
                     ) : null}
@@ -713,7 +745,7 @@ export default function AgendasScreen() {
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
           <View style={[styles.modalHeader, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder }]}>
             <AppText variant="h3" color={colors.textPrimary} weight="700" numberOfLines={1} style={{ flex: 1 }}>
-              {selectedItem?.title || selectedItem?.name || `تقرير #${selectedItem?.id}`}
+              {selectedItem?.title || selectedItem?.name || (isAr ? `تقرير #${selectedItem?.id}` : `Record #${selectedItem?.id}`)}
             </AppText>
             <TouchableOpacity
               onPress={() => setSelectedItem(null)}
@@ -724,75 +756,325 @@ export default function AgendasScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <View
-              style={[
-                styles.modalCard,
-                shadows.card,
-                {
-                  backgroundColor: colors.cardBg,
-                  borderColor: colors.cardBorder,
-                  borderRadius: borderRadius.card,
-                },
-              ]}
-            >
-              <AppText variant="caption" color={colors.textMuted} weight="700" style={styles.modalFieldLabel}>
-                {isAr ? 'العنوان / التعريف:' : 'Title / Identifier:'}
-              </AppText>
-              <AppText variant="body" color={colors.textPrimary} weight="600" style={styles.modalFieldValue}>
-                {selectedItem?.title || selectedItem?.name || `سجل رقم #${selectedItem?.id}`}
-              </AppText>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {selectedItem?.modalType === 'group' ? (
+              /* GROUP AGENDA FULL DETAILS */
+              <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
+                <View style={styles.sectionHeaderRow}>
+                  <FileText size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                  <AppText variant="h4" color={colors.textPrimary} weight="800">
+                    {isAr ? 'بيانات التقرير والخدمة' : 'Report & Servant Details'}
+                  </AppText>
+                </View>
 
-              {selectedItem?.agenda_date || selectedItem?.created_at ? (
-                <>
-                  <AppText variant="caption" color={colors.textMuted} weight="700" style={styles.modalFieldLabel}>
-                    {isAr ? 'التاريخ:' : 'Date:'}
-                  </AppText>
-                  <AppText variant="body" color={colors.textPrimary} style={styles.modalFieldValue}>
-                    {(selectedItem?.agenda_date || selectedItem?.created_at || '').slice(0, 10)}
-                  </AppText>
-                </>
-              ) : null}
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'مقدم التقرير:' : 'Submitter:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} weight="600">
+                      {selectedItem.submitter_name || (isAr ? 'غير محدد' : 'N/A')}
+                    </AppText>
+                  </View>
 
-              {selectedItem?.submitter_name ? (
-                <>
-                  <AppText variant="caption" color={colors.textMuted} weight="700" style={styles.modalFieldLabel}>
-                    {isAr ? 'مقدم التقرير:' : 'Submitter:'}
-                  </AppText>
-                  <AppText variant="body" color={colors.textPrimary} style={styles.modalFieldValue}>
-                    {selectedItem.submitter_name}
-                  </AppText>
-                </>
-              ) : null}
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'الصفة الخدمية:' : 'Position:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} weight="600">
+                      {selectedItem.service_position || 'GSR'}
+                    </AppText>
+                  </View>
 
-              {selectedItem?.service_position ? (
-                <>
-                  <AppText variant="caption" color={colors.textMuted} weight="700" style={styles.modalFieldLabel}>
-                    {isAr ? 'الصفة الخدمية:' : 'Service Position:'}
-                  </AppText>
-                  <AppText variant="body" color={colors.textPrimary} style={styles.modalFieldValue}>
-                    {selectedItem.service_position}
-                  </AppText>
-                </>
-              ) : null}
+                  {selectedItem.alt_gsr_name ? (
+                    <View style={styles.detailGridItem}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                        {isAr ? 'نائب ممثل الخدمة (Alt GSR):' : 'Alt GSR Name:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary}>
+                        {selectedItem.alt_gsr_name}
+                      </AppText>
+                    </View>
+                  ) : null}
 
-              {selectedItem?.description ? (
-                <>
-                  <AppText variant="caption" color={colors.textMuted} weight="700" style={styles.modalFieldLabel}>
-                    {isAr ? 'البيان / التفاصيل:' : 'Details:'}
-                  </AppText>
-                  <AppText variant="body" color={colors.textPrimary} style={styles.modalFieldValue}>
-                    {selectedItem.description}
-                  </AppText>
-                </>
-              ) : null}
+                  {selectedItem.agenda_date ? (
+                    <View style={styles.detailGridItem}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                        {isAr ? 'تاريخ التقرير:' : 'Report Date:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary}>
+                        {String(selectedItem.agenda_date).slice(0, 10)}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
 
-              <View style={[styles.officialBadge, { backgroundColor: colors.accentLight }]}>
-                <ShieldAlert size={14} color={colors.accentDark} style={{ marginEnd: 6 }} />
-                <AppText variant="caption" color={colors.accentDark} weight="700">
-                  {isAr ? 'وثيقة رسمية معتمدة من زمالة NA مصر' : 'Official Document - NA Egypt'}
-                </AppText>
+                {/* Group Health Section */}
+                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
+                  <Users size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                  <AppText variant="h4" color={colors.textPrimary} weight="800">
+                    {isAr ? 'حالة اجتماعات المجموعة' : 'Meetings & Fellowship Status'}
+                  </AppText>
+                </View>
+
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'الاجتماعات الأسبوعية:' : 'Meetings / Week:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary}>
+                      {selectedItem.meetings_per_week ? `${selectedItem.meetings_per_week} ${isAr ? 'اجتماعات' : 'meetings'}` : (isAr ? 'غير محدد' : 'N/A')}
+                    </AppText>
+                  </View>
+
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'متوسط الأعضاء الجدد:' : 'Newcomers Average:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary}>
+                      {selectedItem.new_comers !== undefined ? `${selectedItem.new_comers} ${isAr ? 'أعضاء' : 'members'}` : (isAr ? 'غير مسجل' : 'N/A')}
+                    </AppText>
+                  </View>
+
+                  {selectedItem.next_business_meeting ? (
+                    <View style={styles.detailGridItemFull}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                        {isAr ? 'تاريخ اجتماع الأعمال القادم:' : 'Next Business Meeting:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.success} weight="700">
+                        {String(selectedItem.next_business_meeting).slice(0, 10)}
+                      </AppText>
+                    </View>
+                  ) : null}
+
+                  {selectedItem.open_positions ? (
+                    <View style={styles.detailGridItemFull}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                        {isAr ? 'المناصب الخدمية الشاغرة:' : 'Open Service Positions:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.danger} weight="600">
+                        {selectedItem.open_positions}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Atmosphere & Finance */}
+                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
+                  <HeartHandshake size={18} color={colors.success} style={{ marginEnd: 8 }} />
+                  <AppText variant="h4" color={colors.textPrimary} weight="800">
+                    {isAr ? 'جو التعافي والشؤون المالية' : 'Atmosphere of Recovery & Finance'}
+                  </AppText>
+                </View>
+
+                {selectedItem.recovery_atmosphere ? (
+                  <View style={{ marginTop: 8 }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'جو التعافي داخل المجموعة:' : 'Recovery Atmosphere:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
+                      {selectedItem.recovery_atmosphere}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {selectedItem.financial_issues ? (
+                  <View style={{ marginTop: 12 }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'الوضع المالي والاحتياطي الحكيم (التقليد السابع):' : '7th Tradition & Financial Status:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
+                      {selectedItem.financial_issues}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {selectedItem.trusted_servants ? (
+                  <View style={{ marginTop: 12 }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'حالة الخدام الموثوقين:' : 'Trusted Servants Status:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
+                      {selectedItem.trusted_servants}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {/* Other Topics / Array */}
+                {selectedItem.other_topics && Array.isArray(selectedItem.other_topics) && selectedItem.other_topics.length > 0 ? (
+                  <View style={{ marginTop: 18 }}>
+                    <View style={styles.sectionHeaderRow}>
+                      <MessageSquare size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                      <AppText variant="h4" color={colors.textPrimary} weight="800">
+                        {isAr ? 'مواضيع ونقاط إضافية للمناقشة' : 'Additional Discussion Topics'}
+                      </AppText>
+                    </View>
+                    {selectedItem.other_topics.map((tItem: any, tIdx: number) => (
+                      <View key={tIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}>
+                        <AppText variant="body" color={colors.textPrimary} weight="700">
+                          {tItem.title || `${isAr ? 'بند' : 'Topic'} #${tIdx + 1}`}
+                        </AppText>
+                        {tItem.content ? (
+                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4 }}>
+                            {tItem.content}
+                          </AppText>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
+            ) : selectedItem?.modalType === 'service_body' ? (
+              /* SERVICE BODY AGENDA DETAILS */
+              <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
+                <View style={styles.sectionHeaderRow}>
+                  <Building2 size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                  <AppText variant="h4" color={colors.textPrimary} weight="800">
+                    {isAr ? 'تفاصيل جدول أعمال الهيئة الخدمية' : 'Service Body Agenda Details'}
+                  </AppText>
+                </View>
+
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'الهيئة الخدمية:' : 'Service Body:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} weight="700">
+                      {selectedItem.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee')}
+                    </AppText>
+                  </View>
+
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'الحالة:' : 'Status:'}
+                    </AppText>
+                    <Badge
+                      label={selectedItem.status === 'approved' ? (isAr ? 'معتمد' : 'Approved') : (isAr ? 'قيد المراجعة' : 'Submitted')}
+                      variant={selectedItem.status === 'approved' ? 'success' : 'warning'}
+                      size="sm"
+                    />
+                  </View>
+
+                  {selectedItem.meeting_date || selectedItem.created_at ? (
+                    <View style={styles.detailGridItemFull}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                        {isAr ? 'تاريخ الاجتماع / التوثيق:' : 'Meeting Date:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary}>
+                        {String(selectedItem.meeting_date || selectedItem.created_at).slice(0, 10)}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
+
+                {selectedItem.description || selectedItem.content ? (
+                  <View style={{ marginTop: 16 }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'البيان / محضر الاجتماع:' : 'Minutes / Description:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22 }}>
+                      {selectedItem.description || selectedItem.content}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {/* Voting Questions */}
+                {selectedItem.questions && Array.isArray(selectedItem.questions) && selectedItem.questions.length > 0 ? (
+                  <View style={{ marginTop: 20 }}>
+                    <View style={styles.sectionHeaderRow}>
+                      <HelpCircle size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                      <AppText variant="h4" color={colors.textPrimary} weight="800">
+                        {isAr ? 'بنود وأسئلة التصويت للأعضاء' : 'Voting Topics & Questions'}
+                      </AppText>
+                    </View>
+                    {selectedItem.questions.map((q: any, qIdx: number) => (
+                      <View key={qIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}>
+                        <AppText variant="body" color={colors.primary} weight="700">
+                          {`${qIdx + 1}. ${q.title || q.question || (isAr ? 'بند للتصويت' : 'Voting Item')}`}
+                        </AppText>
+                        {q.description || q.details ? (
+                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4 }}>
+                            {q.description || q.details}
+                          </AppText>
+                        ) : null}
+                        {q.answer ? (
+                          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
+                            <Badge label={isAr ? `القرار: ${q.answer}` : `Decision: ${q.answer}`} variant="accent" size="sm" />
+                          </View>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              /* COMMITTEE REPORT DETAILS */
+              <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
+                <View style={styles.sectionHeaderRow}>
+                  <FileArchive size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                  <AppText variant="h4" color={colors.textPrimary} weight="800">
+                    {isAr ? 'تفاصيل تقرير اللجنة الخدمية' : 'Committee Report Details'}
+                  </AppText>
+                </View>
+
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'اللجنة الخدمية:' : 'Service Committee:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} weight="700">
+                      {selectedItem?.committee_name || selectedItem?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee')}
+                    </AppText>
+                  </View>
+
+                  <View style={styles.detailGridItem}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'فترة التقرير:' : 'Reporting Period:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary}>
+                      {selectedItem?.period || (selectedItem?.created_at ? String(selectedItem.created_at).slice(0, 10) : (isAr ? 'الفترة الحالية' : 'Current'))}
+                    </AppText>
+                  </View>
+                </View>
+
+                {selectedItem?.description || selectedItem?.body || selectedItem?.content ? (
+                  <View style={{ marginTop: 16 }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                      {isAr ? 'ملخص الأنشطة والتقرير:' : 'Activity Summary & Report Body:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22 }}>
+                      {selectedItem.description || selectedItem.body || selectedItem.content}
+                    </AppText>
+                  </View>
+                ) : null}
+
+                {/* Document Download / View */}
+                {selectedItem?.file_url || selectedItem?.attachment_url || selectedItem?.document_url ? (
+                  <View style={{ marginTop: 20 }}>
+                    <AppButton
+                      title={isAr ? 'فتح وتحميل ملف التقرير المرفق (PDF/Doc)' : 'Open & Download Attached File'}
+                      onPress={() => {
+                        const url = selectedItem?.file_url || selectedItem?.attachment_url || selectedItem?.document_url;
+                        if (url) {
+                          Linking.openURL(url).catch(() => {
+                            Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'تعذر فتح ملف الوثيقة.' : 'Could not open document URL.');
+                          });
+                        }
+                      }}
+                      variant="primary"
+                      size="md"
+                      icon={<ExternalLink size={16} color="#ffffff" />}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            <View style={[styles.officialBadge, { backgroundColor: colors.accentLight }]}>
+              <ShieldCheck size={16} color={colors.accentDark} style={{ marginEnd: 6 }} />
+              <AppText variant="caption" color={colors.accentDark} weight="700">
+                {isAr ? 'وثيقة رسمية معتمدة من زمالة NA مصر' : 'Official Verified Document - NA Egypt'}
+              </AppText>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -924,7 +1206,7 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 5,
   },
   modalContainer: {
     flex: 1,
@@ -946,24 +1228,43 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 16,
+    paddingBottom: 36,
   },
   modalCard: {
     padding: 18,
     borderWidth: 1,
+    marginBottom: 14,
   },
-  modalFieldLabel: {
-    marginTop: 12,
-    marginBottom: 2,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  modalFieldValue: {
-    lineHeight: 22,
+  detailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  detailGridItem: {
+    width: '47%',
+  },
+  detailGridItemFull: {
+    width: '100%',
+    marginTop: 4,
+  },
+  subTopicCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
   },
   officialBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 18,
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 8,
   },
   loggedOutScrollContent: {
     padding: 16,

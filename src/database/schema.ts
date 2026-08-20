@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 6,
+  version: 8,
   tables: [
     tableSchema({
       name: 'meetings',
@@ -17,10 +17,15 @@ export const schema = appSchema({
         { name: 'address_en', type: 'string', isOptional: true },
         { name: 'location_url', type: 'string', isOptional: true },
         { name: 'topic_name', type: 'string', isOptional: true },
+        { name: 'topic_name_ar', type: 'string', isOptional: true },
+        { name: 'topic_name_en', type: 'string', isOptional: true },
         { name: 'city_name_ar', type: 'string', isOptional: true, isIndexed: true },
         { name: 'city_name_en', type: 'string', isOptional: true, isIndexed: true },
         { name: 'neighborhood_name_ar', type: 'string', isOptional: true, isIndexed: true },
         { name: 'neighborhood_name_en', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'gsr_name_ar', type: 'string', isOptional: true },
+        { name: 'gsr_name_en', type: 'string', isOptional: true },
+        { name: 'gsr_phone', type: 'string', isOptional: true },
         { name: 'start_time', type: 'string', isOptional: true },
         { name: 'end_time', type: 'string', isOptional: true },
         { name: 'formatted_start_time', type: 'string', isOptional: true },

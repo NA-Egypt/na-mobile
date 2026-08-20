@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 
+export interface MeetingReminder {
+  offsetHours: 1 | 2;
+  notificationId: string;
+}
+
 interface AppState {
   recentSearches: string[];
   addRecentSearch: (term: string) => void;
@@ -8,6 +13,10 @@ interface AppState {
   bookmarks: Record<string, boolean>;
   toggleBookmark: (id: string) => void;
   isBookmarked: (id: string) => boolean;
+  meetingReminders: Record<string, MeetingReminder>;
+  setMeetingReminder: (meetingId: string, reminder: MeetingReminder) => void;
+  removeMeetingReminder: (meetingId: string) => void;
+  getMeetingReminder: (meetingId: string) => MeetingReminder | undefined;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -43,5 +52,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   isBookmarked: (id: string) => {
     return !!get().bookmarks[id];
+  },
+  meetingReminders: {},
+  setMeetingReminder: (meetingId: string, reminder: MeetingReminder) => {
+    set((state) => ({
+      meetingReminders: {
+        ...state.meetingReminders,
+        [meetingId]: reminder,
+      },
+    }));
+  },
+  removeMeetingReminder: (meetingId: string) => {
+    set((state) => {
+      const copy = { ...state.meetingReminders };
+      delete copy[meetingId];
+      return { meetingReminders: copy };
+    });
+  },
+  getMeetingReminder: (meetingId: string) => {
+    return get().meetingReminders[meetingId];
   },
 }));

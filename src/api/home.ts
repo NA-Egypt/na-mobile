@@ -37,4 +37,16 @@ export const homeApi = {
     const response = await apiClient.get<ApiResponse<FrontpageStats> | FrontpageStats>('/stats');
     return (response.data as ApiResponse<FrontpageStats>).data || (response.data as FrontpageStats);
   },
+
+  /**
+   * Retrieves regional helplines.
+   */
+  async getHelplines(): Promise<any[]> {
+    try {
+      const home = await this.getHomeData();
+      return home.helplines || [];
+    } catch {
+      return [];
+    }
+  },
 };

@@ -5,6 +5,7 @@
     "offline_banner": "You are offline - displaying locally stored data"
   },
   "tabs": {
+    "home": "Home",
     "meetings": "Meetings",
     "events": "Events",
     "agendas": "Agendas & Reports",

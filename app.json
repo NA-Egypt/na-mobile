@@ -8,9 +8,9 @@
     "scheme": ["naegypt", "msauth.org.naegypt.app"],
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#32557f"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,

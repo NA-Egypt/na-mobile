@@ -7,3 +7,4 @@ export * from './EmptyState';
 export * from './SearchBar';
 export * from './LanguageSwitcher';
 export * from './FilterChips';
+export * from './AppHeader';

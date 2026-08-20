@@ -25,14 +25,13 @@ import { addOutboxAction } from '../../src/database/outboxWorker';
 import { database } from '../../src/database';
 import OutboxAction from '../../src/database/models/OutboxAction';
 import { useAppTheme } from '../../src/theme';
-import { AppText, Badge, AppButton, LanguageSwitcher } from '../../src/components/ui';
-import { ThemeToggle } from '../../src/components/ThemeToggle';
+import { AppText, Badge, AppButton, AppHeader } from '../../src/components/ui';
 import { haptic } from '../../src/utils/haptics';
 
 export default function ContactScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const { colors, borderRadius, shadows } = useAppTheme();
+  const { colors, borderRadius, shadows, isDark } = useAppTheme();
 
   const [senderName, setSenderName] = useState('');
   const [senderContact, setSenderContact] = useState('');
@@ -122,7 +121,7 @@ export default function ContactScreen() {
         submitted_at: new Date().toISOString(),
       };
 
-      await addOutboxAction('/contact-us', 'POST', payload);
+      await addOutboxAction('/contact-requests', 'POST', payload);
       haptic.success();
 
       Alert.alert(
@@ -143,28 +142,11 @@ export default function ContactScreen() {
   };
 
   return (
-    <View style={[styles.screenWrapper, { backgroundColor: colors.primaryDark }]}>
-      <SafeAreaView style={[styles.safeHeader, { backgroundColor: colors.primaryDark }]} edges={['top']}>
-        <View style={styles.headerBanner}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight + '40' }]}>
-            <MessageSquare size={20} color={colors.accent} />
-          </View>
-          <View style={styles.headerTextCol}>
-            <AppText variant="h3" color="#ffffff" weight="800">
-              {isAr ? 'اتصل بنا' : 'Contact Us'}
-            </AppText>
-            <AppText variant="caption" color="rgba(224, 248, 252, 0.75)">
-              {isAr
-                ? 'تواصل مع لجنة الخدمة والعلاقات العامة لزمالة NA مصر'
-                : 'Get in touch with NA Egypt PR & Service Committee'}
-            </AppText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle />
-            <LanguageSwitcher />
-          </View>
-        </View>
-      </SafeAreaView>
+    <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
+      <AppHeader
+        title={isAr ? 'اتصل بنا' : 'Contact Us'}
+        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • PR & Service Committee'}
+      />
 
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

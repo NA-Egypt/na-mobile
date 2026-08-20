@@ -12,8 +12,12 @@ export const groupsApi = {
    * Retrieves groups collection with pagination & relations.
    */
   async getGroups(filters?: GroupQueryFilters): Promise<PaginatedResponse<Group> | Group[]> {
+    const params = {
+      per_page: 100,
+      ...(filters || {}),
+    };
     const response = await apiClient.get<PaginatedResponse<Group> | Group[]>('/groups', {
-      params: filters,
+      params,
     });
     return response.data;
   },
