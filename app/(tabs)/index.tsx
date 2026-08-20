@@ -69,22 +69,16 @@ export default function HomeScreen() {
       whatsapp: '+201060933888',
     },
     {
-      region: 'Alexandria & North Coast',
-      region_ar: 'الإسكندرية والساحل الشمالي',
-      phones: ['+201006979198', '+201060933888'],
-      whatsapp: '+201060933888',
+      region: 'Alexandria',
+      region_ar: 'الإسكندرية',
+      phones: ['+201503884411'],
+      whatsapp: '+201503884411',
     },
     {
-      region: 'Delta & Canal Cities',
-      region_ar: 'الدلتا ومدن القناة',
-      phones: ['+201006979198', '+201060933888'],
-      whatsapp: '+201060933888',
-    },
-    {
-      region: 'Upper Egypt & Red Sea',
-      region_ar: 'صعيد مصر والبحر الأحمر',
-      phones: ['+201006979198', '+201060933888'],
-      whatsapp: '+201060933888',
+      region: 'Al Ahram',
+      region_ar: 'الأهرام',
+      phones: ['+201003694690'],
+      whatsapp: '+201003694690',
     },
   ];
 
@@ -92,20 +86,40 @@ export default function HomeScreen() {
 
   const loadHomeData = async () => {
     try {
-      const [statsRes, jftRes, helplinesRes] = await Promise.allSettled([
+      const todayIso = new Date().toISOString().split('T')[0];
+      const nextYearIso = new Date(new Date().getFullYear() + 1, 11, 31).toISOString().split('T')[0];
+
+      const [statsRes, jftRes, homeDataRes, calEventsRes] = await Promise.allSettled([
         homeApi.getStats(),
         homeApi.getJft(),
-        homeApi.getHelplines(),
+        homeApi.getHomeData(),
+        homeApi.getHomeData().catch(() => null),
       ]);
 
-      if (statsRes.status === 'fulfilled' && statsRes.value) {
-        setStats((prev) => ({ ...prev, ...statsRes.value }));
+      let upcomingEventsCount = 0;
+
+      if (homeDataRes.status === 'fulfilled' && homeDataRes.value) {
+        const home = homeDataRes.value;
+        if (Array.isArray(home.helplines) && home.helplines.length > 0) {
+          setHelplines(home.helplines);
+        }
+        if (Array.isArray(home.upcoming_events)) {
+          upcomingEventsCount = home.upcoming_events.length;
+        }
       }
+
+      if (statsRes.status === 'fulfilled' && statsRes.value) {
+        setStats((prev) => ({
+          ...prev,
+          ...statsRes.value,
+          upcoming_events: upcomingEventsCount || statsRes.value.upcoming_events || prev.upcoming_events,
+        }));
+      } else if (upcomingEventsCount > 0) {
+        setStats((prev) => ({ ...prev, upcoming_events: upcomingEventsCount }));
+      }
+
       if (jftRes.status === 'fulfilled' && jftRes.value) {
         setJft(jftRes.value);
-      }
-      if (helplinesRes.status === 'fulfilled' && Array.isArray(helplinesRes.value) && helplinesRes.value.length > 0) {
-        setHelplines(helplinesRes.value);
       }
     } catch (e) {
       // Keep resilient cached fallback

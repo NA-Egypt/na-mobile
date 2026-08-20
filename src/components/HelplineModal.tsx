@@ -38,28 +38,22 @@ interface HelplineModalProps {
 
 const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
   {
-    region: 'Cairo & Giza Area',
-    region_ar: 'منطقة القاهرة والجيزة',
+    region: 'Cairo & Giza',
+    region_ar: 'القاهرة والجيزة',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
   },
   {
-    region: 'Alexandria & North Coast Area',
-    region_ar: 'منطقة الإسكندرية والساحل الشمالي',
-    phones: ['+201006979198', '+201060933888'],
-    whatsapp: 'https://wa.me/201060933888',
+    region: 'Alexandria',
+    region_ar: 'الإسكندرية',
+    phones: ['+201503884411'],
+    whatsapp: 'https://wa.me/201503884411',
   },
   {
-    region: 'Delta & Canal Area',
-    region_ar: 'منطقة الدلتا ومدن القناة',
-    phones: ['+201006979198', '+201060933888'],
-    whatsapp: 'https://wa.me/201060933888',
-  },
-  {
-    region: 'Upper Egypt & Red Sea Area',
-    region_ar: 'منطقة صعيد مصر والبحر الأحمر',
-    phones: ['+201006979198', '+201060933888'],
-    whatsapp: 'https://wa.me/201060933888',
+    region: 'Al Ahram',
+    region_ar: 'الأهرام',
+    phones: ['+201003694690'],
+    whatsapp: 'https://wa.me/201003694690',
   },
 ];
 
@@ -68,7 +62,7 @@ const OFFICIAL_DEFAULT_SOCIAL: SocialLinks = {
   instagram: 'https://www.instagram.com/narcoticsanonymousegy',
   tiktok: 'https://www.tiktok.com/@narcoticsanonymousegypt',
   whatsapp: 'https://wa.me/201060933888',
-  email: 'hello@naegypt.org',
+  email: 'pr@naegypt.org',
 };
 
 export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }) => {

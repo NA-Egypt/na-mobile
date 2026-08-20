@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, StyleSheet } from 'react-native';
-import { Home, MapPin, Calendar, FileText, Send } from 'lucide-react-native';
+import { Home, MapPin, Calendar, Award, FileText, Send } from 'lucide-react-native';
 import { useAppTheme } from '../../src/theme';
 import { haptic } from '../../src/utils/haptics';
 
@@ -57,6 +57,17 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
               <MapPin color={color} size={focused ? 23 : 21} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cleantime"
+        options={{
+          title: t('tabs.cleantime'),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
+              <Award color={color} size={focused ? 23 : 21} />
             </View>
           ),
         }}
