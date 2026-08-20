@@ -58,7 +58,7 @@ export default function HomeScreen() {
       day: 'numeric',
     }),
     quote: 'نحن لا نستطيع أن نغير من أين أتينا، ولكننا نستطيع أن نغير إلى أين نحن ذاهبون.',
-    quote_source: 'الكتاب الأساسي لزمالة NA',
+    quote_source: 'الكتاب الأساسي لزمالة المدمنين المجهولين',
   });
 
   const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
@@ -139,13 +139,13 @@ export default function HomeScreen() {
 
   const handleCall = (phoneNumber: string) => {
     haptic.selection();
-    Linking.openURL(`tel:${phoneNumber}`).catch(() => {});
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => { });
   };
 
   const handleWhatsApp = (whatsappNumber: string) => {
     haptic.selection();
     const cleanNum = whatsappNumber.replace(/[^0-9]/g, '');
-    Linking.openURL(`https://wa.me/2${cleanNum}`).catch(() => {});
+    Linking.openURL(`https://wa.me/2${cleanNum}`).catch(() => { });
   };
 
   return (
@@ -176,7 +176,7 @@ export default function HomeScreen() {
             </View>
             <View style={[styles.welcomeTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
               <AppText variant="h2" color={colors.textPrimary} weight="800" style={{ textAlign: isAr ? 'right' : 'left' }}>
-                {isAr ? 'أهلاً بك في زمالة NA مصر' : 'Welcome to NA Egypt'}
+                {isAr ? 'أهلاً بك في زمالة المدمنين المجهولين' : 'Welcome to NA Egypt'}
               </AppText>
               <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
                 {isAr

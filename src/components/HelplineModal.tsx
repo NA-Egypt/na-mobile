@@ -102,14 +102,14 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
           const sbList = Array.isArray(sbRes.data?.data)
             ? sbRes.data.data
             : Array.isArray(sbRes.data)
-            ? sbRes.data
-            : [];
+              ? sbRes.data
+              : [];
 
           const sbHelplines = sbList
             .filter((sb: any) => sb.phone || sb.email)
             .map((sb: any) => ({
               region: sb.en_name || sb.name || 'Area Service',
-              region_ar: sb.ar_name || sb.name_ar || sb.area_name || 'هيئة الخدمة',
+              region_ar: sb.ar_name || sb.name_ar || sb.area_name || 'منتدى أو منطقة',
               phones: sb.phone ? [sb.phone] : [],
               whatsapp: sb.phone ? `https://wa.me/${sb.phone.replace(/[^0-9]/g, '')}` : undefined,
             }));
@@ -209,7 +209,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
             <HeartHandshake size={28} color={colors.accent} style={{ marginBottom: 6 }} />
             <AppText variant="body" color="#ffffff" weight="700" style={[styles.bannerText, { textAlign: isAr ? 'right' : 'left' }]}>
               {isAr
-                ? 'هل تعاني أو يعاني شخص قريب منك من مشكلة مع المخدرات؟ لست وحدك، زمالة NA تمد لك يد المساعدة بكل سرية ومجانية.'
+                ? 'هل تعاني أو يعاني شخص قريب منك من مشكلة مع المخدرات؟ لست وحدك، زمالة المدمنين المجهولين تمد لك يد المساعدة بكل سرية ومجانية.'
                 : 'Are you or a loved one struggling with drugs? You are not alone. NA offers confidential, free support.'}
             </AppText>
             <View style={[styles.bannerBadge, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
@@ -304,8 +304,8 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
               </AppText>
               <AppText variant="caption" color={colors.textSecondary} style={{ textAlign: 'center', marginBottom: 12 }}>
                 {isAr
-                  ? 'يتم تحديث خطوط المساعدة مباشرة من إدارة الزمالة عبر egyptna.org.'
-                  : 'Helplines are maintained and published directly from egyptna.org.'}
+                  ? 'يتم تحديث خطوط المساعدة مباشرة من naegypt.org.'
+                  : 'Helplines are maintained and published directly from naegypt.org.'}
               </AppText>
               <AppButton
                 title={isAr ? 'إعادة المحاولة' : 'Retry'}
@@ -347,7 +347,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                     Facebook
                   </AppText>
                   <AppText variant="caption" color={colors.textSecondary}>
-                    {isAr ? 'الصفحة الرسمية لزمالة NA مصر' : 'Official Facebook Page'}
+                    {isAr ? 'الصفحة الرسمية لزمالة المدمنين المجهولين' : 'Official Facebook Page'}
                   </AppText>
                 </View>
                 <ExternalLink size={16} color={colors.textMuted} />

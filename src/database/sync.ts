@@ -326,8 +326,8 @@ export async function pullMasterData(): Promise<void> {
             topicNameAr = String(item.topic_ar || item.topic_name || item.topic || '');
             topicNameEn = String(
               item.topic_en ||
-                STANDARD_TOPIC_EN_MAP[topicNameAr] ||
-                (topicNameAr && !/[\u0600-\u06FF]/.test(topicNameAr) ? topicNameAr : '')
+              STANDARD_TOPIC_EN_MAP[topicNameAr] ||
+              (topicNameAr && !/[\u0600-\u06FF]/.test(topicNameAr) ? topicNameAr : '')
             );
           }
 
@@ -444,7 +444,7 @@ export async function pullMasterData(): Promise<void> {
           item.name_ar ||
           item.en_title ||
           item.event_name ||
-          'فعالية زمالة NA';
+          'فعالية زمالة المدمنين المجهولين';
 
         const description =
           item.description ||

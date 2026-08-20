@@ -147,31 +147,31 @@ const NA_LITERATURE_QUOTES = [
   {
     quoteAr: 'لليوم فقط: ستكون أفكاري متجهة نحو تعافيي، عائشاً ومستمتعاً بالحياة دون استخدام المخدرات.',
     quoteEn: 'Just for today, my thoughts will be on my recovery, living and enjoying life without the use of drugs.',
-    sourceAr: 'النص الأساسي لزمالة NA',
+    sourceAr: 'النص الأساسي لزمالة المدمنين المجهولين',
     sourceEn: 'NA Basic Text',
   },
   {
     quoteAr: 'نحن لا نستطيع أن نغير من أين أتينا، ولكننا نستطيع أن نغير إلى أين نحن ذاهبون.',
     quoteEn: 'We cannot change where we come from, but we can change where we are going.',
-    sourceAr: 'النص الأساسي لزمالة NA',
+    sourceAr: 'النص الأساسي لزمالة المدمنين المجهولين',
     sourceEn: 'NA Basic Text',
   },
   {
     quoteAr: 'إن امتناني يتحدث عندما أهتم وأشارك الآخرين بطريقة زمالة المدمنين المجهولين.',
     quoteEn: 'My gratitude speaks when I care and when I share with others the NA way.',
-    sourceAr: 'النص الأساسي لزمالة NA',
+    sourceAr: 'النص الأساسي لزمالة المدمنين المجهولين',
     sourceEn: 'NA Basic Text',
   },
   {
     quoteAr: 'أي مدمن يمكنه التوقف عن التعاطي وفقدان الرغبة وإيجاد طريقة جديدة للحياة.',
     quoteEn: 'An addict, any addict, can stop using drugs, lose the desire to use, and find a new way to live.',
-    sourceAr: 'النص الأساسي لزمالة NA',
+    sourceAr: 'النص الأساسي لزمالة المدمنين المجهولين',
     sourceEn: 'NA Basic Text',
   },
   {
     quoteAr: 'واصل الحضور، البرنامج يعمل!',
     quoteEn: 'Keep coming back, it works!',
-    sourceAr: 'شعار زمالة NA',
+    sourceAr: 'شعار زمالة المدمنين المجهولين',
     sourceEn: 'NA Fellowship Slogan',
   },
 ];
@@ -204,14 +204,14 @@ export default function CleantimeScreen() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const saveCleanDate = async (newDate: Date) => {
     setCleanDate(newDate);
     try {
       await SecureStore.setItemAsync(CLEAN_DATE_STORAGE_KEY, newDate.toISOString());
-    } catch {}
+    } catch { }
   };
 
   // Calculate clean time intervals
@@ -249,12 +249,12 @@ export default function CleantimeScreen() {
 
   const milestoneProgress = nextMilestone
     ? Math.min(
-        100,
-        Math.max(
-          0,
-          ((totalDays - prevMilestoneDays) / (nextMilestone.days - prevMilestoneDays)) * 100
-        )
+      100,
+      Math.max(
+        0,
+        ((totalDays - prevMilestoneDays) / (nextMilestone.days - prevMilestoneDays)) * 100
       )
+    )
     : 100;
   const daysRemaining = nextMilestone ? Math.max(0, nextMilestone.days - totalDays) : 0;
 
@@ -273,9 +273,9 @@ export default function CleantimeScreen() {
     try {
       await Share.share({
         message: shareMessage,
-        title: t('cleantime.share_title', 'أيام تعافيي في زمالة NA'),
+        title: t('cleantime.share_title', 'أيام تعافيي في زمالة المدمنين المجهولين'),
       });
-    } catch {}
+    } catch { }
   };
 
   const handleOpenPicker = () => {
@@ -383,7 +383,7 @@ export default function CleantimeScreen() {
           ]}
         >
           <View style={styles.heroGlowCircle} />
-          
+
           <View style={[styles.heroHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
             <Sparkles size={20} color={colors.accent} />
             <AppText variant="label" color="#ffffff" weight="800" style={{ letterSpacing: 0.5 }}>
@@ -543,7 +543,7 @@ export default function CleantimeScreen() {
         {/* 5. NA Keytags & Medallions Progression */}
         <View style={styles.sectionTitleRow}>
           <AppText variant="h3" weight="800" color={colors.textPrimary}>
-            {t('cleantime.keytags_title', 'ميداليات ومراحل زمالة NA')}
+            {t('cleantime.keytags_title', 'ميداليات ومراحل زمالة المدمنين المجهولين')}
           </AppText>
         </View>
 

@@ -69,9 +69,9 @@ export default function LoginScreen() {
       Alert.alert(
         isAr ? 'تنبيه المصادقة' : 'Authentication Notice',
         result.error ||
-          (isAr
-            ? 'تعذر إتمام عملية الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.'
-            : 'Could not complete Microsoft sign in. Please try again.')
+        (isAr
+          ? 'تعذر إتمام عملية الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.'
+          : 'Could not complete Microsoft sign in. Please try again.')
       );
     } catch (error: any) {
       console.warn('OAuth Error:', error);
@@ -175,7 +175,7 @@ export default function LoginScreen() {
             style={styles.subtitle}
           >
             {isAr
-              ? 'تسجيل الدخول الموحد (Microsoft SSO) للاطلاع على جداول أعمال الهيئات الخدمية، محاضر الاجتماعات والتقارير الإقليمية.'
+              ? 'تسجيل الدخول الموحد (Microsoft SSO) للاطلاع على جداول أعمال الالمنتديات أو المناطق الخدمية، محاضر الاجتماعات والتقارير الإقليمية.'
               : 'Single Sign-On (Microsoft SSO) to view Service Body Agendas, Meeting Minutes, and Regional Committee Reports.'}
           </AppText>
         </View>
@@ -257,7 +257,7 @@ export default function LoginScreen() {
             <View style={styles.featureItem}>
               <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
               <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'الوصول المباشر لأجندات اللجان وتقارير الهيئات الخدمية' : 'Direct access to Sub-committee Agendas & reports'}
+                {isAr ? 'الوصول المباشر لأجندات اللجان وتقارير الالمنتديات أو المناطق الخدمية' : 'Direct access to Sub-committee Agendas & reports'}
               </AppText>
             </View>
             <View style={styles.featureItem}>

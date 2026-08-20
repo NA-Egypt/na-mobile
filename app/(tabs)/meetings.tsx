@@ -93,7 +93,7 @@ export default function MeetingsScreen() {
         );
 
         const groupName = isAr
-          ? m.groupNameAr || m.groupNameEn || 'اجتماع زمالة NA'
+          ? m.groupNameAr || m.groupNameEn || 'اجتماع زمالة المدمنين المجهولين'
           : m.groupNameEn || m.groupNameAr || 'NA Meeting';
 
         const cityName = isAr
@@ -152,7 +152,7 @@ export default function MeetingsScreen() {
     homeApi
       .getStats()
       .then((st) => setFrontpageStats(st))
-      .catch(() => {});
+      .catch(() => { });
 
     const subscription = database
       .get<Meeting>('meetings')
@@ -362,12 +362,10 @@ export default function MeetingsScreen() {
         <View style={styles.resultsHeaderRow}>
           <AppText variant="label" color={isDark ? '#38bdf8' : colors.primary} weight="700">
             {isAr
-              ? `${filteredMeetings.length} اجتماع متاح${
-                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
-                }`
-              : `${filteredMeetings.length} meetings found${
-                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
-                }`}
+              ? `${filteredMeetings.length} اجتماع متاح${frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
+              }`
+              : `${filteredMeetings.length} meetings found${frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
+              }`}
           </AppText>
           {activeFilterItems.length > 0 && (
             <TouchableOpacity onPress={handleClearAllFilters}>

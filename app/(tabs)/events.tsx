@@ -84,7 +84,7 @@ export default function EventsScreen() {
       item.name_ar ||
       item.en_title ||
       item.event_name ||
-      (isAr ? 'فعالية زمالة NA' : 'NA Event');
+      (isAr ? 'فعالية زمالة المدمنين المجهولين' : 'NA Event');
     const description =
       item.description ||
       item.ar_description ||
@@ -207,7 +207,7 @@ export default function EventsScreen() {
 
   useEffect(() => {
     loadEvents();
-    pullMasterData().catch(() => {});
+    pullMasterData().catch(() => { });
 
     const subscription = database
       .get<EventModel>('events')
@@ -223,7 +223,7 @@ export default function EventsScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await pullMasterData().catch(() => {});
+    await pullMasterData().catch(() => { });
     await loadEvents();
     setIsRefreshing(false);
   };
@@ -467,8 +467,8 @@ export default function EventsScreen() {
                           isSelected
                             ? '#ffffff'
                             : hasEvents
-                            ? colors.accentDark
-                            : colors.textPrimary
+                              ? colors.accentDark
+                              : colors.textPrimary
                         }
                         weight={isSelected || hasEvents ? '700' : '500'}
                       >
@@ -602,13 +602,13 @@ export default function EventsScreen() {
               const startDateObj = item.startDate ? new Date(item.startDate) : null;
               const formattedDate = startDateObj
                 ? startDateObj.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
                 : '';
 
               return (

@@ -253,7 +253,7 @@ export default function AgendasScreen() {
     <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
       <AppHeader
         title={isAr ? 'جداول الأعمال والأرشيف' : 'Agendas & Reports'}
-        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • Service Archive'}
+        subtitle={isAr ? 'مصر • أرشيف الخدمة' : 'Egypt • Service Archive'}
         bottomSlot={
           <View style={styles.tabSelectorWrapper}>
             <ScrollView
@@ -307,7 +307,7 @@ export default function AgendasScreen() {
                   color={activeTab === 'service_bodies' ? (isDark ? '#38bdf8' : colors.primary) : '#ffffff'}
                   weight="700"
                 >
-                  {isAr ? 'الهيئات الخدمية' : 'Service Bodies'}
+                  {isAr ? 'المنتديات أو المناطق' : 'Service Bodies'}
                 </AppText>
               </TouchableOpacity>
 
@@ -361,7 +361,7 @@ export default function AgendasScreen() {
               <View style={styles.userInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                   <AppText variant="body" color={colors.textPrimary} weight="700">
-                    {user.name || (isAr ? 'خادم زمالة معتمد' : 'Trusted Servant')}
+                    {user.name || (isAr ? 'خادم مؤتمن' : 'Trusted Servant')}
                   </AppText>
                   <Badge
                     label={isAr ? 'حساب مايكروسوفت معتمد' : 'Verified MS Account'}
@@ -399,12 +399,12 @@ export default function AgendasScreen() {
               </View>
               <View style={styles.lockInfo}>
                 <AppText variant="body" color={colors.textPrimary} weight="700">
-                  {isAr ? 'بوابة خادمي اللجان والمجموعات' : 'Trusted Servants Portal'}
+                  {isAr ? 'بوابة خدم اللجان والمجموعات' : 'Trusted Servants Portal'}
                 </AppText>
                 <AppText variant="caption" color={colors.textSecondary} style={{ marginTop: 2 }}>
                   {isAr
-                    ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف اللجان وجداول الأعمال'
-                    : 'Sign in with Microsoft to access committee archives'}
+                    ? 'سجل دخولك بحساب الخدمة للاطلاع على أرشيف اللجان وجداول الأعمال'
+                    : 'Sign in with your NA account to access committee archives'}
                 </AppText>
               </View>
               <AppButton
@@ -440,20 +440,20 @@ export default function AgendasScreen() {
               <AppText variant="h3" color={colors.textPrimary} weight="800" style={{ textAlign: 'center', marginBottom: 6 }}>
                 {activeTab === 'groups'
                   ? isAr
-                    ? 'أجندات المجموعات - خادمي المجموعات'
+                    ? 'أجندات المجموعات - خدم المجموعات'
                     : 'Group Agendas - Trusted Servants'
                   : activeTab === 'service_bodies'
-                  ? isAr
-                    ? 'أجندات الهيئات - مجلس الخدمة'
-                    : 'Service Body Agendas'
-                  : isAr
-                  ? 'أرشيف تقارير اللجان الخدمية'
-                  : 'Committee Reports Archive'}
+                    ? isAr
+                      ? 'أجندات المنتديات أو المناطق'
+                      : 'Service Body Agendas'
+                    : isAr
+                      ? 'أرشيف تقارير اللجان الخدمية'
+                      : 'Committee Reports Archive'}
               </AppText>
               <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
                 {isAr
-                  ? 'هذا القسم مخصص للخدام المعتمدين في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ egyptna.org للاطلاع على البيانات والتقارير المتاحة لرتبتك الخدمية.'
-                  : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official egyptna.org Microsoft account to access reports and agendas permitted for your role.'}
+                  ? 'هذا القسم مخصص للخدام المعتمدين في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ naegypt.org. للاطلاع على البيانات والتقارير المتاحة لخدمتك.'
+                  : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official naegypt.org Microsoft account to access reports and agendas permitted for your role.'}
               </AppText>
               <AppButton
                 title={t('agendas.login_prompt')}
@@ -488,7 +488,7 @@ export default function AgendasScreen() {
               </AppText>
               <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 16 }}>
                 {isAr
-                  ? `يتطلب هذا القسم صلاحيات محددة (مثل RSC أو هيئة خدمة). رتبتك المسجلة حالياً: ${user.roles?.join(', ') || (isAr ? 'خادم موثوق' : 'Servant')}.`
+                  ? `يتطلب هذا القسم صلاحيات محددة (مثل RSC أو كيان خدمي). رتبتك المسجلة حالياً: ${user.roles?.join(', ') || (isAr ? 'خادم موثوق' : 'Servant')}.`
                   : `This section requires specific permissions (RSC or Service Body). Your registered role: ${user.roles?.join(', ') || 'Servant'}.`}
               </AppText>
               <AppButton
@@ -628,7 +628,7 @@ export default function AgendasScreen() {
                       <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                         <Calendar size={14} color={colors.success} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
                         <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
-                          {isAr ? `اجتماع الأعمال القادم: ${String(item.next_business_meeting).slice(0, 10)}` : `Next Business Mtg: ${String(item.next_business_meeting).slice(0, 10)}`}
+                          {isAr ? `اجتماع العمل القادم: ${String(item.next_business_meeting).slice(0, 10)}` : `Next Business Mtg: ${String(item.next_business_meeting).slice(0, 10)}`}
                         </AppText>
                       </View>
                     ) : null}
@@ -647,8 +647,8 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else if (activeTab === 'service_bodies') {
-                const title = item.title || item.name || (isAr ? 'جدول أعمال هيئة خدمية' : 'Service Body Agenda');
-                const sbName = item.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee');
+                const title = item.title || item.name || (isAr ? 'جدول أعمال منطقة أو منتدى' : 'Service Body Agenda');
+                const sbName = item.service_body_name || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee');
                 const isApproved = item.status === 'approved';
                 const dateStr = item.meeting_date || item.agenda_date || item.created_at || '';
 
@@ -711,7 +711,7 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else {
-                const committeeName = item?.committee_name || item?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee');
+                const committeeName = item?.committee_name || item?.committee?.name || (isAr ? 'لجنة خدمية' : 'Service Committee');
                 const period = item?.period || item?.report_date || (item?.created_at ? String(item.created_at).slice(0, 10) : '');
                 const title = item?.title || item?.name || `${committeeName}${period ? ` - ${period}` : ''}`;
                 const isApproved = item?.status === 'approved';
@@ -979,17 +979,17 @@ export default function AgendasScreen() {
                 <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                   <Building2 size={18} color={colors.primary} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
-                    {isAr ? 'تفاصيل جدول أعمال الهيئة الخدمية' : 'Service Body Agenda Details'}
+                    {isAr ? 'تفاصيل جدول أعمال المنتديات أو المناطق' : 'Service Body Agenda Details'}
                   </AppText>
                 </View>
 
                 <View style={styles.detailGrid}>
                   <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                     <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {isAr ? 'الهيئة الخدمية:' : 'Service Body:'}
+                      {isAr ? 'المنتديات أو المناطق:' : 'Service Body:'}
                     </AppText>
                     <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {selectedItem.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee')}
+                      {selectedItem.service_body_name || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee')}
                     </AppText>
                   </View>
 
@@ -1122,7 +1122,7 @@ export default function AgendasScreen() {
             <View style={[styles.officialBadge, { backgroundColor: colors.accentLight }]}>
               <ShieldCheck size={16} color={colors.accentDark} style={{ marginEnd: 6 }} />
               <AppText variant="caption" color={colors.accentDark} weight="700">
-                {isAr ? 'وثيقة رسمية معتمدة من زمالة NA مصر' : 'Official Verified Document - NA Egypt'}
+                {isAr ? 'وثيقة من زمالة المدمنين المجهولين' : 'Official Verified Document - NA Egypt'}
               </AppText>
             </View>
           </ScrollView>

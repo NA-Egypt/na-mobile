@@ -60,7 +60,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ visible, onClose }) 
     haptic.selection();
 
     const payload = {
-      name: senderName.trim() || (isAr ? 'عضو زمالة NA' : 'NA Member'),
+      name: senderName.trim() || (isAr ? 'عضو زمالة المدمنين المجهولين' : 'NA Member'),
       email: senderContact.trim() || null,
       contact: senderContact.trim() || null,
       subject: subject.trim() || (isAr ? 'استفسار من تطبيق الهاتف' : 'Mobile App Inquiry'),

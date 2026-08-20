@@ -112,7 +112,7 @@ export default function ContactScreen() {
     setIsSubmitting(true);
     try {
       const payload = {
-        name: senderName.trim() || 'عضو زمالة NA',
+        name: senderName.trim() || 'عضو زمالة المدمنين المجهولين',
         contact: senderContact.trim() || null,
         subject: subject.trim() || 'استفسار عام من تطبيق الهاتف',
         message: details.trim(),
@@ -127,7 +127,7 @@ export default function ContactScreen() {
       Alert.alert(
         isAr ? 'تم حفظ الرسالة' : 'Message Saved',
         isAr
-          ? 'تم حفظ استفسارك بنجاح، وسيتم إرساله للجنة العلاقات العامة والخدمة فور توفر الاتصال بالإنترنت.'
+          ? 'تم حفظ استفسارك بنجاح، وسيتم إرساله للجنة العلاقات العامة فور توفر الاتصال بالإنترنت.'
           : 'Your message has been saved and will send automatically when online.'
       );
 
@@ -145,7 +145,7 @@ export default function ContactScreen() {
     <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
       <AppHeader
         title={isAr ? 'اتصل بنا' : 'Contact Us'}
-        subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • PR & Service Committee'}
+        subtitle={isAr ? 'مصر • زمالة المدمنين المجهولين' : 'Egypt • Narcotics Anonymous'}
       />
 
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>

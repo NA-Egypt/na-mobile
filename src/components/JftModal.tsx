@@ -53,16 +53,16 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
           quote: isAr
             ? 'إن امتناننا هو ما يحفظ تعافينا حياً ونابضاً بالروح.'
             : 'Our gratitude speaks when we care and when we share with others the NA way.',
-          quote_source: isAr ? 'النص الأساسي لزمالة NA' : 'NA Basic Text',
+          quote_source: isAr ? 'النص الأساسي لزمالة المدمنين المجهولين' : 'NA Basic Text',
           content: isAr
             ? [
-                'في تعافينا، نكتشف كل يوم أن البقاء ممتنعين عن المخدرات ليوم واحد هو هبة عظيمة.',
-                'عندما نشارك خبرتنا وأملنا وقوتنا مع المدمن الذي لا يزال يعاني، نكتشف معنى الحرية الحقيقية.',
-              ]
+              'في تعافينا، نكتشف كل يوم أن البقاء ممتنعين عن المخدرات ليوم واحد هو هبة عظيمة.',
+              'عندما نشارك خبرتنا وأملنا وقوتنا مع المدمن الذي لا يزال يعاني، نكتشف معنى الحرية الحقيقية.',
+            ]
             : [
-                'In our recovery, we discover each day that staying clean for just today is a profound gift.',
-                'When we share our experience, strength, and hope with the addict who still suffers, we find true freedom.',
-              ],
+              'In our recovery, we discover each day that staying clean for just today is a profound gift.',
+              'When we share our experience, strength, and hope with the addict who still suffers, we find true freedom.',
+            ],
           thought_for_the_day: isAr
             ? 'لليوم فقط: سأكون ممتناً لتعافيي، وسأبذل قصارى جهدي لمساعدة زميل آخر.'
             : 'Just For Today: I will be grateful for my recovery and reach out to help another fellow.',
@@ -79,11 +79,11 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
         quote_source: isAr ? 'كتيب لليوم فقط' : 'Just For Today Book',
         content: isAr
           ? [
-              'لا داعي للقلق بشأن الغد أو التفكير في أخطاء الأمس. كل ما نملكه هو هذه الـ 24 ساعة الحالية لنعيشها بنقاء وسلام.',
-            ]
+            'لا داعي للقلق بشأن الغد أو التفكير في أخطاء الأمس. كل ما نملكه هو هذه الـ 24 ساعة الحالية لنعيشها بنقاء وسلام.',
+          ]
           : [
-              'There is no need to worry about tomorrow or live in the regret of yesterday. We only have these current 24 hours to live in peace and clarity.',
-            ],
+            'There is no need to worry about tomorrow or live in the regret of yesterday. We only have these current 24 hours to live in peace and clarity.',
+          ],
         thought_for_the_day: isAr
           ? 'لليوم فقط: لن أخاف، وسأثق في قوتي العظمى وأعضاء الزمالة.'
           : 'Just For Today: I will be unafraid, trusting my Higher Power and my NA fellowship.',
@@ -103,7 +103,7 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
     if (!jft) return;
     haptic.selection();
     try {
-      const shareMessage = `📖 ${jft.title || 'لليوم فقط'}\n${jft.page_date ? `📅 ${jft.page_date}\n` : ''}\n"${jft.quote || ''}"\n— ${jft.quote_source || 'زمالة NA'}\n\n${(jft.content || []).join('\n\n')}\n\n✨ ${jft.thought_for_the_day || ''}\n\n📱 تطبيق زمالة NA مصر\nhttps://egyptna.org`;
+      const shareMessage = `📖 ${jft.title || 'لليوم فقط'}\n${jft.page_date ? `📅 ${jft.page_date}\n` : ''}\n"${jft.quote || ''}"\n— ${jft.quote_source || 'زمالة المدمنين المجهولين'}\n\n${(jft.content || []).join('\n\n')}\n\n✨ ${jft.thought_for_the_day || ''}\n\n📱 تطبيق زمالة المدمنين المجهولين\nhttps://egyptna.org`;
       await Share.share({
         message: shareMessage,
         title: jft.title || 'لليوم فقط - NA Egypt',
@@ -189,7 +189,7 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
                   />
                 ) : null}
                 <Badge
-                  label={isAr ? 'زمالة NA مصر' : 'NA Egypt'}
+                  label={isAr ? 'زمالة المدمنين المجهولين' : 'NA Egypt'}
                   variant="neutral"
                   size="sm"
                 />
@@ -273,7 +273,7 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
                 <View style={styles.thoughtHeader}>
                   <Flame size={18} color={colors.accentDark} style={{ marginEnd: 6 }} />
                   <AppText variant="label" color={colors.accentDark} weight="800">
-                    {isAr ? 'فكرة اليوم (Thought for Today)' : 'Thought For Today'}
+                    {isAr ? 'لليوم فقط' : 'Just For Today'}
                   </AppText>
                 </View>
                 <AppText variant="body" color={colors.accentDark} weight="700" style={styles.thoughtText}>
