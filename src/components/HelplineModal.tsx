@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   HeartHandshake,
   Globe,
+  Clock,
 } from 'lucide-react-native';
 import { homeApi } from '../api/home';
 import { apiClient } from '../api/client';
@@ -38,22 +39,28 @@ interface HelplineModalProps {
 
 const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
   {
-    region: 'Cairo & Giza',
-    region_ar: 'القاهرة والجيزة',
+    region: 'Egypt Region (General)',
+    region_ar: 'إقليم مصر (عام)',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
+    hours: '10 AM - 12 Midnight',
+    hours_ar: '١٠ ص - ١٢ منتصف الليل',
   },
   {
     region: 'Alexandria',
     region_ar: 'الإسكندرية',
     phones: ['+201503884411'],
     whatsapp: 'https://wa.me/201503884411',
+    hours: '12 PM - 10 PM',
+    hours_ar: '١٢ م - ١٠ م',
   },
   {
-    region: 'Al Ahram',
+    region: 'Al-Ahram Area',
     region_ar: 'الأهرام',
     phones: ['+201003694690'],
     whatsapp: 'https://wa.me/201003694690',
+    hours: '12 PM - 10 PM',
+    hours_ar: '١٢ م - ١٠ م',
   },
 ];
 
@@ -256,6 +263,15 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                     size="sm"
                   />
                 </View>
+
+                {(item.hours || item.hours_ar) ? (
+                  <View style={[styles.hoursRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                    <Clock size={13} color={colors.accent} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                    <AppText variant="caption" color={colors.textSecondary} weight="600">
+                      {isAr ? (item.hours_ar || item.hours) : (item.hours || item.hours_ar)}
+                    </AppText>
+                  </View>
+                ) : null}
 
                 <View style={styles.phoneList}>
                   {item.phones && item.phones.length > 0 ? (
@@ -463,6 +479,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
   phoneList: {

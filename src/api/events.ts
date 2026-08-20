@@ -4,6 +4,9 @@ import {
   CalendarEventQueryFilters,
   CreateCalendarEventPayload,
   UpdateCalendarEventPayload,
+  AnnouncementEvent,
+  CreateAnnouncementEventPayload,
+  UpdateAnnouncementEventPayload,
   ApiResponse,
 } from './types';
 
@@ -70,14 +73,56 @@ export const eventsApi = {
   /**
    * Retrieves general announcement events (/events).
    */
-  async getEvents(): Promise<any[]> {
-    const response = await apiClient.get<ApiResponse<any[]> | any[]>('/events');
+  async getEvents(): Promise<AnnouncementEvent[]> {
+    const response = await apiClient.get<ApiResponse<AnnouncementEvent[]> | AnnouncementEvent[]>('/events');
     if (Array.isArray(response.data)) {
       return response.data;
     }
-    if (Array.isArray((response.data as ApiResponse<any[]>).data)) {
-      return (response.data as ApiResponse<any[]>).data;
+    if (Array.isArray((response.data as ApiResponse<AnnouncementEvent[]>).data)) {
+      return (response.data as ApiResponse<AnnouncementEvent[]>).data;
     }
     return [];
+  },
+
+  /**
+   * Retrieves a single announcement event (/events/{id}).
+   */
+  async getEvent(id: number | string): Promise<AnnouncementEvent> {
+    const response = await apiClient.get<ApiResponse<AnnouncementEvent> | AnnouncementEvent>(
+      `/events/${id}`
+    );
+    return (response.data as ApiResponse<AnnouncementEvent>).data || (response.data as AnnouncementEvent);
+  },
+
+  /**
+   * Creates an announcement event (requires authentication).
+   */
+  async createEvent(payload: CreateAnnouncementEventPayload): Promise<AnnouncementEvent> {
+    const response = await apiClient.post<ApiResponse<AnnouncementEvent> | AnnouncementEvent>(
+      '/events',
+      payload
+    );
+    return (response.data as ApiResponse<AnnouncementEvent>).data || (response.data as AnnouncementEvent);
+  },
+
+  /**
+   * Updates an announcement event (requires authentication).
+   */
+  async updateEvent(
+    id: number | string,
+    payload: UpdateAnnouncementEventPayload
+  ): Promise<AnnouncementEvent> {
+    const response = await apiClient.put<ApiResponse<AnnouncementEvent> | AnnouncementEvent>(
+      `/events/${id}`,
+      payload
+    );
+    return (response.data as ApiResponse<AnnouncementEvent>).data || (response.data as AnnouncementEvent);
+  },
+
+  /**
+   * Deletes an announcement event (requires authentication).
+   */
+  async deleteEvent(id: number | string): Promise<void> {
+    await apiClient.delete(`/events/${id}`);
   },
 };

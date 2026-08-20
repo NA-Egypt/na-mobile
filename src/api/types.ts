@@ -219,6 +219,30 @@ export interface CreateCalendarEventPayload {
 
 export interface UpdateCalendarEventPayload extends Partial<CreateCalendarEventPayload> {}
 
+// Announcements & Events (/api/v1/events)
+export interface AnnouncementEvent {
+  id: number;
+  name: string;
+  description?: string;
+  date: string;
+  service_body_id?: number;
+  service_body?: ServiceBody;
+  day_id?: number;
+  day?: Day;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateAnnouncementEventPayload {
+  name: string;
+  description?: string;
+  date: string;
+  service_body_id?: number;
+  day_id?: number;
+}
+
+export interface UpdateAnnouncementEventPayload extends Partial<CreateAnnouncementEventPayload> {}
+
 // Group Agendas
 export interface AgendaTopic {
   title: string;
@@ -429,6 +453,8 @@ export interface HelplineItem {
   region_ar: string;
   phones: string[];
   whatsapp?: string;
+  hours?: string;
+  hours_ar?: string;
 }
 
 export interface SocialLinks {
