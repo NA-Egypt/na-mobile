@@ -139,10 +139,28 @@ Fetches all aggregated frontpage data in one consolidated response (stats, daily
       },
       "helplines": [
         {
-          "region": "Cairo & Giza",
-          "region_ar": "القاهرة والجيزة",
+          "region": "Egypt Region (General)",
+          "region_ar": "إقليم مصر (عام)",
           "phones": ["+201006979198", "+201060933888"],
-          "whatsapp": "https://wa.me/201060933888"
+          "whatsapp": "https://wa.me/201060933888",
+          "hours": "10 AM - 12 Midnight",
+          "hours_ar": "١٠ ص - ١٢ منتصف الليل"
+        },
+        {
+          "region": "Alexandria",
+          "region_ar": "الإسكندرية",
+          "phones": ["+201503884411"],
+          "whatsapp": "https://wa.me/201503884411",
+          "hours": "12 PM - 10 PM",
+          "hours_ar": "١٢ م - ١٠ م"
+        },
+        {
+          "region": "Al-Ahram Area",
+          "region_ar": "الأهرام",
+          "phones": ["+201003694690"],
+          "whatsapp": "https://wa.me/201003694690",
+          "hours": "12 PM - 10 PM",
+          "hours_ar": "١٢ م - ١٠ م"
         }
       ],
       "social_links": {
@@ -288,13 +306,37 @@ Returns details of the specified group.
 ### 3.3 Calendar Events (`/api/v1/calendar-events`)
 
 #### `GET /api/v1/calendar-events`
+- **Access:** Public
 - **Query Params:**
   - `start`: ISO-8601 date string (e.g. `2026-08-01`)
   - `end`: ISO-8601 date string (e.g. `2026-08-31`)
   *(When both `start` and `end` are passed, recurring occurrences are automatically expanded into discrete instances)*
+- **Response (200 OK):**
+  ```json
+  {
+    "data": [
+      {
+        "id": 1,
+        "title": "Regional Committee Meeting",
+        "start": "2026-09-01T10:00:00.000000Z",
+        "end": "2026-09-01T14:00:00.000000Z",
+        "description": "Monthly regional service committee meeting.",
+        "user_id": 1,
+        "color": "#00698f",
+        "organizer": "Cairo Area",
+        "location": "Community Hall, Cairo",
+        "recurrence": ["monthly", "1st"],
+        "formatted_recurrence": "First Tuesday",
+        "is_featured": true,
+        "created_at": "2026-08-20T00:00:00.000000Z",
+        "updated_at": "2026-08-20T00:00:00.000000Z"
+      }
+    ]
+  }
+  ```
 
 #### `GET /api/v1/calendar-events/{id}`
-Returns a single calendar event.
+Returns a single calendar event object.
 
 #### `POST /api/v1/calendar-events` *(Auth Required)*
 - **Body Schema:**
@@ -307,20 +349,79 @@ Returns a single calendar event.
     "color": "#00698f",
     "organizer": "Cairo Area",
     "location": "Community Hall, Cairo",
-    "recurrence": ["monthly", "1st_sunday"],
+    "recurrence": ["monthly", "1st"],
     "is_featured": true
   }
   ```
+- **Response (201 Created):** Single `CalendarEventResource` object.
 
 #### `PUT /api/v1/calendar-events/{id}` *(Auth Required)*
-Updates calendar event details.
+Updates calendar event details (all fields accept partial updates).
+- **Response (200 OK):** Updated `CalendarEventResource` object.
 
 #### `DELETE /api/v1/calendar-events/{id}` *(Auth Required)*
 - **Response (200 OK):** `{"message": "Deleted successfully"}`
 
 ---
 
-### 3.4 Group Agendas (`/api/v1/agendas`)
+### 3.4 Announcements & Events (`/api/v1/events`)
+
+#### `GET /api/v1/events`
+- **Access:** Public
+- **Response (200 OK):**
+  ```json
+  {
+    "data": [
+      {
+        "id": 1,
+        "name": "Unity Convention",
+        "description": "Annual convention gathering",
+        "date": "2026-10-15",
+        "service_body_id": 1,
+        "service_body": {
+          "id": 1,
+          "ar_name": "لجنة مصر",
+          "en_name": "Egypt RSC"
+        },
+        "day_id": 1,
+        "day": {
+          "id": 1,
+          "ar_name": "السبت",
+          "en_name": "Saturday"
+        },
+        "created_at": "2026-08-20T00:00:00.000000Z",
+        "updated_at": "2026-08-20T00:00:00.000000Z"
+      }
+    ]
+  }
+  ```
+
+#### `GET /api/v1/events/{id}`
+Returns a single event object with loaded relations (`day`, `servicebody`).
+
+#### `POST /api/v1/events` *(Auth Required)*
+- **Body Schema:**
+  ```json
+  {
+    "name": "Unity Convention",
+    "description": "Annual convention gathering",
+    "date": "2026-10-15",
+    "service_body_id": 1,
+    "day_id": 1
+  }
+  ```
+- **Response (201 Created):** Single `EventResource` object.
+
+#### `PUT /api/v1/events/{id}` *(Auth Required)*
+Updates event details (supports partial updates).
+- **Response (200 OK):** Updated `EventResource` object.
+
+#### `DELETE /api/v1/events/{id}` *(Auth Required)*
+- **Response (204 No Content)**
+
+---
+
+### 3.5 Group Agendas (`/api/v1/agendas`)
 
 #### `GET /api/v1/agendas`
 Returns all group agenda submissions.
@@ -360,7 +461,7 @@ Updates agenda submission.
 
 ---
 
-### 3.5 Lookups & Directory Resources (Public Read)
+### 3.6 Lookups & Directory Resources (Public Read)
 
 | Resource Endpoint | GET (Public) | POST/PUT/DELETE (Auth) | Description |
 | :--- | :--- | :--- | :--- |
