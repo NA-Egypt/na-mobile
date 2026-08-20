@@ -156,15 +156,15 @@ export default function HomeScreen() {
       >
         {/* Welcome Banner */}
         <View style={[styles.welcomeCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-          <View style={styles.welcomeHeader}>
-            <View style={[styles.welcomeIconWrapper, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight }]}>
+          <View style={[styles.welcomeHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.welcomeIconWrapper, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight, marginEnd: isAr ? 0 : 12, marginStart: isAr ? 12 : 0 }]}>
               <HeartHandshake size={24} color={isDark ? '#22d3ee' : colors.accentDark} />
             </View>
-            <View style={styles.welcomeTextCol}>
-              <AppText variant="h2" color={colors.textPrimary} weight="800">
+            <View style={[styles.welcomeTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+              <AppText variant="h2" color={colors.textPrimary} weight="800" style={{ textAlign: isAr ? 'right' : 'left' }}>
                 {isAr ? 'أهلاً بك في زمالة NA مصر' : 'Welcome to NA Egypt'}
               </AppText>
-              <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 2 }}>
+              <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
                 {isAr
                   ? 'أي مدمن يمكنه التوقف عن التعاطي وفقدان الرغبة وإيجاد طريقة جديدة للحياة.'
                   : 'Any addict can stop using, lose the desire to use, and find a new way to live.'}
@@ -174,7 +174,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Live Fellowship Stats Grid */}
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
           <AppText variant="h3" color={colors.textPrimary} weight="800">
             {isAr ? 'إحصائيات وخدمات الزمالة' : 'Fellowship Overview'}
           </AppText>
@@ -195,7 +195,7 @@ export default function HomeScreen() {
               <Clock size={20} color={isDark ? '#38bdf8' : colors.primary} />
             </View>
             <AppText variant="h1" color={isDark ? '#38bdf8' : colors.primary} weight="800" style={styles.statNumber}>
-              {stats.weekly_meetings || stats.total_meetings || '75+'}
+              {stats.weekly_meetings || stats.total_meetings || '0'}
             </AppText>
             <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
               {isAr ? 'اجتماع أسبوعي' : 'Weekly Meetings'}
@@ -215,7 +215,7 @@ export default function HomeScreen() {
               <Users size={20} color={isDark ? '#22d3ee' : colors.accentDark} />
             </View>
             <AppText variant="h1" color={isDark ? '#22d3ee' : colors.accentDark} weight="800" style={styles.statNumber}>
-              {stats.groups || stats.total_groups || '35+'}
+              {stats.groups || stats.total_groups || '0'}
             </AppText>
             <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
               {isAr ? 'مجموعة نشطة' : 'Active Groups'}
@@ -228,7 +228,7 @@ export default function HomeScreen() {
               <Compass size={20} color={isDark ? '#fbbf24' : colors.goldDark} />
             </View>
             <AppText variant="h1" color={isDark ? '#fbbf24' : colors.goldDark} weight="800" style={styles.statNumber}>
-              {stats.governorates || stats.cities || '9+'}
+              {stats.governorates || stats.cities || '0'}
             </AppText>
             <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
               {isAr ? 'محافظات مغطاة' : 'Governorates'}
@@ -248,7 +248,7 @@ export default function HomeScreen() {
               <Calendar size={20} color={isDark ? '#34d399' : colors.success} />
             </View>
             <AppText variant="h1" color={isDark ? '#34d399' : colors.success} weight="800" style={styles.statNumber}>
-              {stats.upcoming_events || '4+'}
+              {stats.upcoming_events !== undefined && stats.upcoming_events !== null ? String(stats.upcoming_events) : '0'}
             </AppText>
             <AppText variant="labelSmall" color={colors.textSecondary} weight="700" style={styles.statLabel}>
               {isAr ? 'فعاليات قادمة' : 'Upcoming Events'}
@@ -259,16 +259,16 @@ export default function HomeScreen() {
         {/* Quick Action Navigation Cards */}
         <View style={styles.quickLinksRow}>
           <TouchableOpacity
-            style={[styles.quickLinkCard, { backgroundColor: isDark ? colors.cardElevated : colors.primaryDark }]}
+            style={[styles.quickLinkCard, { backgroundColor: isDark ? colors.cardElevated : colors.primaryDark, flexDirection: isAr ? 'row-reverse' : 'row' }]}
             onPress={() => {
               haptic.selection();
               router.push('/(tabs)/meetings');
             }}
             activeOpacity={0.85}
           >
-            <View style={styles.quickLinkContent}>
-              <MapPin size={22} color="#ffffff" style={{ marginEnd: 10 }} />
-              <View>
+            <View style={[styles.quickLinkContent, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <MapPin size={22} color="#ffffff" style={{ marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }} />
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start' }}>
                 <AppText variant="label" color="#ffffff" weight="800">
                   {isAr ? 'البحث عن اجتماع الآن' : 'Find a Meeting Now'}
                 </AppText>
@@ -277,52 +277,52 @@ export default function HomeScreen() {
                 </AppText>
               </View>
             </View>
-            <ArrowUpRight size={18} color="#ffffff" />
+            <ArrowUpRight size={18} color="#ffffff" style={{ transform: [{ scaleX: isAr ? -1 : 1 }] }} />
           </TouchableOpacity>
         </View>
 
         {/* Just For Today (لليوم فقط) Card */}
         <View style={[styles.jftCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-          <View style={styles.jftHeader}>
-            <View style={styles.jftTitleRow}>
-              <View style={[styles.jftIconCircle, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.2)' : colors.goldLight }]}>
+          <View style={[styles.jftHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.jftTitleRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.jftIconCircle, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.2)' : colors.goldLight, marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
                 <Sparkles size={18} color={isDark ? '#fbbf24' : colors.goldDark} />
               </View>
-              <View style={{ marginStart: 10 }}>
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start' }}>
                 <AppText variant="h3" color={colors.textPrimary} weight="800">
                   {isAr ? 'لليوم فقط • تأمل التعافي' : 'Just For Today • Daily Reflection'}
                 </AppText>
                 <AppText variant="caption" color={colors.textMuted}>
-                  {jft.date || jft.page_date || 'تأمل اليوم'}
+                  {jft.date || jft.page_date || (isAr ? 'تأمل اليوم' : 'Today')}
                 </AppText>
               </View>
             </View>
             <Badge label={isAr ? 'يومي' : 'Daily'} variant="gold" size="sm" />
           </View>
 
-          <View style={[styles.jftQuoteBox, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid }]}>
-            <AppText variant="h3" color={isDark ? '#38bdf8' : colors.primary} weight="700" style={{ marginBottom: 6 }}>
+          <View style={[styles.jftQuoteBox, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid, alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+            <AppText variant="h3" color={isDark ? '#38bdf8' : colors.primary} weight="700" style={{ marginBottom: 6, textAlign: isAr ? 'right' : 'left' }}>
               {jft.title || (isAr ? 'تأمل اليوم في التعافي' : 'Daily Reflection')}
             </AppText>
-            <AppText variant="body" color={colors.textPrimary} style={styles.jftQuoteText}>
-              "{jft.quote || jft.thought_for_the_day || 'نحن نعيش التعافي يوماً بيوم.'}"
+            <AppText variant="body" color={colors.textPrimary} style={[styles.jftQuoteText, { textAlign: isAr ? 'right' : 'left' }]}>
+              "{jft.quote || jft.thought_for_the_day || (isAr ? 'نحن نعيش التعافي يوماً بيوم.' : 'We live recovery one day at a time.')}"
             </AppText>
             {jft.quote_source ? (
-              <AppText variant="caption" color={colors.textMuted} weight="600" style={{ marginTop: 6 }}>
+              <AppText variant="caption" color={colors.textMuted} weight="600" style={{ marginTop: 6, textAlign: isAr ? 'right' : 'left' }}>
                 — {jft.quote_source}
               </AppText>
             ) : null}
           </View>
 
           <TouchableOpacity
-            style={[styles.jftActionBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight }]}
+            style={[styles.jftActionBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.15)' : colors.accentLight, flexDirection: isAr ? 'row-reverse' : 'row' }]}
             onPress={() => {
               haptic.selection();
               setIsJftVisible(true);
             }}
             activeOpacity={0.8}
           >
-            <Sparkles size={15} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: 6 }} />
+            <Sparkles size={15} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
             <AppText variant="label" color={isDark ? '#22d3ee' : colors.accentDark} weight="700">
               {isAr ? 'قراءة التأمل كاملاً' : 'Read Full Reflection'}
             </AppText>
@@ -330,8 +330,8 @@ export default function HomeScreen() {
         </View>
 
         {/* Helplines Section (خطوط المساعدة) */}
-        <View style={styles.sectionHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={[styles.sectionHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
             <PhoneCall size={18} color={isDark ? '#22d3ee' : colors.accentDark} />
             <AppText variant="h3" color={colors.textPrimary} weight="800">
               {isAr ? 'خطوط المساعدة في مصر' : 'Regional Helplines'}
@@ -353,25 +353,25 @@ export default function HomeScreen() {
           {helplines.slice(0, 3).map((item, idx) => (
             <View
               key={idx}
-              style={[styles.helplineCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+              style={[styles.helplineCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}
             >
-              <View style={styles.helplineInfo}>
-                <AppText variant="body" color={colors.textPrimary} weight="700">
+              <View style={[styles.helplineInfo, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                   {isAr ? item.region_ar || item.region : item.region || item.region_ar}
                 </AppText>
-                <AppText variant="caption" color={colors.textMuted}>
+                <AppText variant="caption" color={colors.textMuted} style={{ textAlign: isAr ? 'right' : 'left' }}>
                   {isAr ? 'متاح للرد والدعم على مدار الساعة' : 'Available for fellowship support'}
                 </AppText>
               </View>
 
-              <View style={styles.helplineActions}>
+              <View style={[styles.helplineActions, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 {item.phones && item.phones.length > 0 && (
                   <TouchableOpacity
-                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.2)' : colors.successLight }]}
+                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.2)' : colors.successLight, flexDirection: isAr ? 'row-reverse' : 'row' }]}
                     onPress={() => handleCall(item.phones[0])}
                     activeOpacity={0.8}
                   >
-                    <Phone size={14} color={isDark ? '#34d399' : colors.success} style={{ marginEnd: 4 }} />
+                    <Phone size={14} color={isDark ? '#34d399' : colors.success} style={{ marginEnd: isAr ? 0 : 4, marginStart: isAr ? 4 : 0 }} />
                     <AppText variant="caption" color={isDark ? '#34d399' : colors.success} weight="700">
                       {item.phones[0]}
                     </AppText>
@@ -380,11 +380,11 @@ export default function HomeScreen() {
 
                 {item.whatsapp && (
                   <TouchableOpacity
-                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.2)' : colors.accentLight }]}
+                    style={[styles.helplineBtn, { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.2)' : colors.accentLight, flexDirection: isAr ? 'row-reverse' : 'row' }]}
                     onPress={() => handleWhatsApp(item.whatsapp!)}
                     activeOpacity={0.8}
                   >
-                    <MessageCircle size={14} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: 4 }} />
+                    <MessageCircle size={14} color={isDark ? '#22d3ee' : colors.accentDark} style={{ marginEnd: isAr ? 0 : 4, marginStart: isAr ? 4 : 0 }} />
                     <AppText variant="caption" color={isDark ? '#22d3ee' : colors.accentDark} weight="700">
                       WhatsApp
                     </AppText>

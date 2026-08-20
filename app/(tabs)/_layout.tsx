@@ -86,12 +86,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="contact"
         options={{
-          title: t('tabs.contact'),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.activeIconWrapper]}>
-              <Send color={color} size={focused ? 23 : 21} />
-            </View>
-          ),
+          href: null,
         }}
       />
     </Tabs>

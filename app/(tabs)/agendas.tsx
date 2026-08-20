@@ -44,6 +44,8 @@ import {
 import { authApi, UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
 import { azureAuthService } from '../../src/services/azureAuthService';
+import { database } from '../../src/database';
+import GroupModel from '../../src/database/models/Group';
 import { useAppTheme } from '../../src/theme';
 import {
   AppText,
@@ -57,6 +59,25 @@ import { haptic } from '../../src/utils/haptics';
 
 type AgendaTabType = 'groups' | 'service_bodies' | 'committees_archive';
 
+function cleanHtmlText(text?: string | null): string {
+  if (!text) return '';
+  return text
+    .replace(/<br\s*[\/]?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export default function AgendasScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
@@ -69,6 +90,7 @@ export default function AgendasScreen() {
   const [groupAgendas, setGroupAgendas] = useState<any[]>([]);
   const [serviceBodyAgendas, setServiceBodyAgendas] = useState<any[]>([]);
   const [committeeReports, setCommitteeReports] = useState<any[]>([]);
+  const [groupLookup, setGroupLookup] = useState<Record<string, { ar_name: string; en_name: string }>>({});
   const [tabForbidden, setTabForbidden] = useState<Record<AgendaTabType, boolean>>({
     groups: false,
     service_bodies: false,
@@ -78,6 +100,24 @@ export default function AgendasScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+
+  useEffect(() => {
+    const loadLocalGroups = async () => {
+      try {
+        const groups = await database.get<GroupModel>('groups').query().fetch();
+        const map: Record<string, { ar_name: string; en_name: string }> = {};
+        groups.forEach((g) => {
+          const item = { ar_name: g.name || '', en_name: g.name || '' };
+          if (g.remoteId) map[String(g.remoteId)] = item;
+          if (g.id) map[String(g.id)] = item;
+        });
+        setGroupLookup(map);
+      } catch (err) {
+        console.warn('Error loading local groups for agenda titles:', err);
+      }
+    };
+    loadLocalGroups();
+  }, []);
 
   const fetchAllData = async (currentUser?: UserProfile | null) => {
     const activeUser = currentUser !== undefined ? currentUser : user;
@@ -95,9 +135,9 @@ export default function AgendasScreen() {
 
     try {
       const [agendasRes, sbRes, reportsRes] = await Promise.allSettled([
-        apiClient.get('/agendas'),
-        apiClient.get('/service-body-agendas'),
-        apiClient.get('/committee-reports'),
+        apiClient.get('/agendas', { params: { per_page: 100 } }),
+        apiClient.get('/service-body-agendas', { params: { per_page: 100 } }),
+        apiClient.get('/committee-reports', { params: { per_page: 100 } }),
       ]);
 
       if (agendasRes.status === 'fulfilled') {
@@ -519,7 +559,17 @@ export default function AgendasScreen() {
                 const dateStr = item.agenda_date || item.created_at || '';
                 const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
                 const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
-                const groupTitle = item.group?.ar_name || item.group?.en_name || item.group_name || (isAr ? `مجموعة #${item.group_id || item.id}` : `Group #${item.group_id || item.id}`);
+                const groupId = item.group_id || item.groupId || item.group?.id;
+                const localGroup = groupId ? groupLookup[String(groupId)] : null;
+                const groupTitle =
+                  (isAr ? item.group?.ar_name || localGroup?.ar_name : item.group?.en_name || localGroup?.en_name) ||
+                  item.group?.ar_name ||
+                  item.group?.en_name ||
+                  localGroup?.ar_name ||
+                  localGroup?.en_name ||
+                  item.group_name ||
+                  item.title ||
+                  (isAr ? 'جدول أعمال مجموعة' : 'Group Business Agenda');
 
                 return (
                   <View
@@ -533,7 +583,7 @@ export default function AgendasScreen() {
                       },
                     ]}
                   >
-                    <View style={styles.cardHeaderRow}>
+                    <View style={[styles.cardHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                       <Badge label={position} variant="accent" size="sm" />
                       {dateStr ? (
                         <Badge
@@ -545,39 +595,39 @@ export default function AgendasScreen() {
                       ) : null}
                     </View>
 
-                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.itemTitle}>
+                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left' }]}>
                       {groupTitle}
                     </AppText>
 
-                    <View style={styles.infoRow}>
-                      <User size={14} color={colors.primary} style={{ marginEnd: 6 }} />
-                      <AppText variant="bodySmall" color={colors.textSecondary}>
+                    <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <User size={14} color={colors.primary} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                      <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? `مقدم التقرير: ${submitter}` : `Submitter: ${submitter}`}
                       </AppText>
                     </View>
 
                     {item.meetings_per_week ? (
-                      <View style={styles.infoRow}>
-                        <Users size={14} color={colors.primary} style={{ marginEnd: 6 }} />
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <Users size={14} color={colors.primary} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `${item.meetings_per_week} اجتماعات أسبوعياً` : `${item.meetings_per_week} meetings/week`}
                         </AppText>
                       </View>
                     ) : null}
 
                     {item.new_comers !== undefined && item.new_comers !== null ? (
-                      <View style={styles.infoRow}>
-                        <UserPlus size={14} color={colors.accentDark} style={{ marginEnd: 6 }} />
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <UserPlus size={14} color={colors.accentDark} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `متوسط الجدد: ${item.new_comers}` : `Newcomers: ${item.new_comers}`}
                         </AppText>
                       </View>
                     ) : null}
 
                     {item.next_business_meeting ? (
-                      <View style={styles.infoRow}>
-                        <Calendar size={14} color={colors.success} style={{ marginEnd: 6 }} />
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <Calendar size={14} color={colors.success} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `اجتماع الأعمال القادم: ${String(item.next_business_meeting).slice(0, 10)}` : `Next Business Mtg: ${String(item.next_business_meeting).slice(0, 10)}`}
                         </AppText>
                       </View>
@@ -587,7 +637,7 @@ export default function AgendasScreen() {
                       title={isAr ? 'عرض جدول الأعمال كاملاً' : 'View Full Agenda'}
                       onPress={() => {
                         haptic.selection();
-                        setSelectedItem({ ...item, modalType: 'group' });
+                        setSelectedItem({ ...item, resolvedTitle: groupTitle, modalType: 'group' });
                       }}
                       variant="primary"
                       size="sm"
@@ -614,7 +664,7 @@ export default function AgendasScreen() {
                       },
                     ]}
                   >
-                    <View style={styles.cardHeaderRow}>
+                    <View style={[styles.cardHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                       <Badge
                         label={isApproved ? (isAr ? 'معتمد' : 'Approved') : (isAr ? 'مقدم' : 'Submitted')}
                         variant={isApproved ? 'success' : 'warning'}
@@ -627,21 +677,21 @@ export default function AgendasScreen() {
                       ) : null}
                     </View>
 
-                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.itemTitle}>
+                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left' }]}>
                       {title}
                     </AppText>
 
-                    <View style={styles.infoRow}>
-                      <Building2 size={14} color={colors.primary} style={{ marginEnd: 6 }} />
-                      <AppText variant="bodySmall" color={colors.textSecondary}>
+                    <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <Building2 size={14} color={colors.primary} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                      <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {sbName}
                       </AppText>
                     </View>
 
                     {item.questions && Array.isArray(item.questions) && item.questions.length > 0 ? (
-                      <View style={styles.infoRow}>
-                        <HelpCircle size={14} color={colors.accentDark} style={{ marginEnd: 6 }} />
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <HelpCircle size={14} color={colors.accentDark} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `${item.questions.length} بنود / أسئلة للتصويت` : `${item.questions.length} Voting Items/Questions`}
                         </AppText>
                       </View>
@@ -651,7 +701,7 @@ export default function AgendasScreen() {
                       title={isAr ? 'عرض جدول الأعمال ومحضر الاجتماع' : 'View Agenda & Minutes'}
                       onPress={() => {
                         haptic.selection();
-                        setSelectedItem({ ...item, modalType: 'service_body' });
+                        setSelectedItem({ ...item, resolvedTitle: title, modalType: 'service_body' });
                       }}
                       variant="primary"
                       size="sm"
@@ -661,10 +711,11 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else {
-                const title = item?.title || item?.name || (isAr ? 'تقرير لجنة فرعية' : 'Committee Report');
                 const committeeName = item?.committee_name || item?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee');
-                const isApproved = item?.status === 'approved';
                 const period = item?.period || item?.report_date || (item?.created_at ? String(item.created_at).slice(0, 10) : '');
+                const title = item?.title || item?.name || `${committeeName}${period ? ` - ${period}` : ''}`;
+                const isApproved = item?.status === 'approved';
+                const cleanDesc = cleanHtmlText(item?.description || item?.body || item?.content);
 
                 return (
                   <View
@@ -678,7 +729,7 @@ export default function AgendasScreen() {
                       },
                     ]}
                   >
-                    <View style={styles.cardHeaderRow}>
+                    <View style={[styles.cardHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                       <Badge label={committeeName} variant="accent" size="sm" />
                       <Badge
                         label={isApproved ? (isAr ? 'أرشيف معتمد' : 'Approved') : (isAr ? 'مقدم' : 'Submitted')}
@@ -687,22 +738,22 @@ export default function AgendasScreen() {
                       />
                     </View>
 
-                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.itemTitle}>
+                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={[styles.itemTitle, { textAlign: isAr ? 'right' : 'left' }]}>
                       {title}
                     </AppText>
 
                     {period ? (
-                      <View style={styles.infoRow}>
-                        <Calendar size={14} color={colors.primary} style={{ marginEnd: 6 }} />
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <Calendar size={14} color={colors.primary} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `الفترة / التاريخ: ${period}` : `Period: ${period}`}
                         </AppText>
                       </View>
                     ) : null}
 
-                    {item?.description ? (
-                      <AppText variant="bodySmall" color={colors.textSecondary} numberOfLines={2} style={{ marginTop: 4, marginBottom: 6 }}>
-                        {item.description}
+                    {cleanDesc ? (
+                      <AppText variant="bodySmall" color={colors.textSecondary} numberOfLines={2} style={[{ marginTop: 4, marginBottom: 6, textAlign: isAr ? 'right' : 'left' }]}>
+                        {cleanDesc}
                       </AppText>
                     ) : null}
 
@@ -710,7 +761,7 @@ export default function AgendasScreen() {
                       title={isAr ? 'قراءة وتحميل الوثيقة' : 'View & Download Document'}
                       onPress={() => {
                         haptic.selection();
-                        setSelectedItem({ ...item, modalType: 'committee' });
+                        setSelectedItem({ ...item, resolvedTitle: title, modalType: 'committee' });
                       }}
                       variant="primary"
                       size="sm"
@@ -743,14 +794,16 @@ export default function AgendasScreen() {
         onRequestClose={() => setSelectedItem(null)}
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder }]}>
-            <AppText variant="h3" color={colors.textPrimary} weight="700" numberOfLines={1} style={{ flex: 1 }}>
-              {selectedItem?.title || selectedItem?.name || (isAr ? `تقرير #${selectedItem?.id}` : `Record #${selectedItem?.id}`)}
+          <View style={[styles.modalHeader, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <AppText variant="h3" color={colors.textPrimary} weight="700" numberOfLines={1} style={[{ flex: 1, textAlign: isAr ? 'right' : 'left' }]}>
+              {selectedItem?.resolvedTitle || selectedItem?.title || selectedItem?.name || (isAr ? 'تفاصيل التقرير' : 'Record Details')}
             </AppText>
             <TouchableOpacity
               onPress={() => setSelectedItem(null)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={[styles.modalCloseBtn, { backgroundColor: colors.bgSecondary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close modal"
             >
               <X size={18} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -760,49 +813,45 @@ export default function AgendasScreen() {
             {selectedItem?.modalType === 'group' ? (
               /* GROUP AGENDA FULL DETAILS */
               <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
-                <View style={styles.sectionHeaderRow}>
-                  <FileText size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <FileText size={18} color={colors.primary} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
-                    {isAr ? 'بيانات التقرير والخدمة' : 'Report & Servant Details'}
+                    {isAr ? 'بيانات تقرير المجموعة' : 'Group Agenda Information'}
                   </AppText>
                 </View>
 
                 <View style={styles.detailGrid}>
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
-                      {isAr ? 'مقدم التقرير:' : 'Submitter:'}
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                      {isAr ? 'اسم المجموعة:' : 'Group Name:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} weight="600">
-                      {selectedItem.submitter_name || (isAr ? 'غير محدد' : 'N/A')}
-                    </AppText>
-                  </View>
-
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
-                      {isAr ? 'الصفة الخدمية:' : 'Position:'}
-                    </AppText>
-                    <AppText variant="body" color={colors.textPrimary} weight="600">
-                      {selectedItem.service_position || 'GSR'}
+                    <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                      {selectedItem.resolvedTitle || (isAr ? 'مجموعة NA' : 'NA Group')}
                     </AppText>
                   </View>
 
-                  {selectedItem.alt_gsr_name ? (
-                    <View style={styles.detailGridItem}>
-                      <AppText variant="caption" color={colors.textMuted} weight="700">
-                        {isAr ? 'نائب ممثل الخدمة (Alt GSR):' : 'Alt GSR Name:'}
-                      </AppText>
-                      <AppText variant="body" color={colors.textPrimary}>
-                        {selectedItem.alt_gsr_name}
-                      </AppText>
-                    </View>
-                  ) : null}
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                      {isAr ? 'مقدم التقرير:' : 'Submitter Servant:'}
+                    </AppText>
+                    <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
+                      {selectedItem.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR')}
+                    </AppText>
+                  </View>
+
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                      {isAr ? 'الموقع الخدمي:' : 'Service Position:'}
+                    </AppText>
+                    <Badge label={selectedItem.service_position || (isAr ? 'خادم موثوق' : 'Servant')} variant="accent" size="sm" />
+                  </View>
 
                   {selectedItem.agenda_date ? (
-                    <View style={styles.detailGridItem}>
-                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? 'تاريخ التقرير:' : 'Report Date:'}
                       </AppText>
-                      <AppText variant="body" color={colors.textPrimary}>
+                      <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {String(selectedItem.agenda_date).slice(0, 10)}
                       </AppText>
                     </View>
@@ -810,92 +859,92 @@ export default function AgendasScreen() {
                 </View>
 
                 {/* Group Health Section */}
-                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
-                  <Users size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                <View style={[styles.sectionHeaderRow, { marginTop: 18, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <Users size={18} color={colors.accentDark} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
                     {isAr ? 'حالة اجتماعات المجموعة' : 'Meetings & Fellowship Status'}
                   </AppText>
                 </View>
 
                 <View style={styles.detailGrid}>
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'الاجتماعات الأسبوعية:' : 'Meetings / Week:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary}>
+                    <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {selectedItem.meetings_per_week ? `${selectedItem.meetings_per_week} ${isAr ? 'اجتماعات' : 'meetings'}` : (isAr ? 'غير محدد' : 'N/A')}
                     </AppText>
                   </View>
 
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'متوسط الأعضاء الجدد:' : 'Newcomers Average:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary}>
+                    <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {selectedItem.new_comers !== undefined ? `${selectedItem.new_comers} ${isAr ? 'أعضاء' : 'members'}` : (isAr ? 'غير مسجل' : 'N/A')}
                     </AppText>
                   </View>
 
                   {selectedItem.next_business_meeting ? (
-                    <View style={styles.detailGridItemFull}>
-                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                    <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? 'تاريخ اجتماع الأعمال القادم:' : 'Next Business Meeting:'}
                       </AppText>
-                      <AppText variant="body" color={colors.success} weight="700">
+                      <AppText variant="body" color={colors.success} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {String(selectedItem.next_business_meeting).slice(0, 10)}
                       </AppText>
                     </View>
                   ) : null}
 
                   {selectedItem.open_positions ? (
-                    <View style={styles.detailGridItemFull}>
-                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                    <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? 'المناصب الخدمية الشاغرة:' : 'Open Service Positions:'}
                       </AppText>
-                      <AppText variant="body" color={colors.danger} weight="600">
-                        {selectedItem.open_positions}
+                      <AppText variant="body" color={colors.danger} weight="600" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {cleanHtmlText(selectedItem.open_positions)}
                       </AppText>
                     </View>
                   ) : null}
                 </View>
 
                 {/* Atmosphere & Finance */}
-                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
-                  <HeartHandshake size={18} color={colors.success} style={{ marginEnd: 8 }} />
+                <View style={[styles.sectionHeaderRow, { marginTop: 18, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <HeartHandshake size={18} color={colors.success} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
                     {isAr ? 'جو التعافي والشؤون المالية' : 'Atmosphere of Recovery & Finance'}
                   </AppText>
                 </View>
 
                 {selectedItem.recovery_atmosphere ? (
-                  <View style={{ marginTop: 8 }}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={{ marginTop: 8, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'جو التعافي داخل المجموعة:' : 'Recovery Atmosphere:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
-                      {selectedItem.recovery_atmosphere}
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
+                      {cleanHtmlText(selectedItem.recovery_atmosphere)}
                     </AppText>
                   </View>
                 ) : null}
 
                 {selectedItem.financial_issues ? (
-                  <View style={{ marginTop: 12 }}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={{ marginTop: 12, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'الوضع المالي والاحتياطي الحكيم (التقليد السابع):' : '7th Tradition & Financial Status:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
-                      {selectedItem.financial_issues}
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
+                      {cleanHtmlText(selectedItem.financial_issues)}
                     </AppText>
                   </View>
                 ) : null}
 
                 {selectedItem.trusted_servants ? (
-                  <View style={{ marginTop: 12 }}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={{ marginTop: 12, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'حالة الخدام الموثوقين:' : 'Trusted Servants Status:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2 }}>
-                      {selectedItem.trusted_servants}
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
+                      {cleanHtmlText(selectedItem.trusted_servants)}
                     </AppText>
                   </View>
                 ) : null}
@@ -903,20 +952,20 @@ export default function AgendasScreen() {
                 {/* Other Topics / Array */}
                 {selectedItem.other_topics && Array.isArray(selectedItem.other_topics) && selectedItem.other_topics.length > 0 ? (
                   <View style={{ marginTop: 18 }}>
-                    <View style={styles.sectionHeaderRow}>
-                      <MessageSquare size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                    <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <MessageSquare size={18} color={colors.accentDark} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                       <AppText variant="h4" color={colors.textPrimary} weight="800">
                         {isAr ? 'مواضيع ونقاط إضافية للمناقشة' : 'Additional Discussion Topics'}
                       </AppText>
                     </View>
                     {selectedItem.other_topics.map((tItem: any, tIdx: number) => (
-                      <View key={tIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}>
-                        <AppText variant="body" color={colors.textPrimary} weight="700">
-                          {tItem.title || `${isAr ? 'بند' : 'Topic'} #${tIdx + 1}`}
+                      <View key={tIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder, alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                        <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                          {cleanHtmlText(tItem.title) || `${isAr ? 'بند' : 'Topic'} #${tIdx + 1}`}
                         </AppText>
                         {tItem.content ? (
-                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4 }}>
-                            {tItem.content}
+                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4, textAlign: isAr ? 'right' : 'left' }}>
+                            {cleanHtmlText(tItem.content)}
                           </AppText>
                         ) : null}
                       </View>
@@ -927,25 +976,25 @@ export default function AgendasScreen() {
             ) : selectedItem?.modalType === 'service_body' ? (
               /* SERVICE BODY AGENDA DETAILS */
               <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
-                <View style={styles.sectionHeaderRow}>
-                  <Building2 size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <Building2 size={18} color={colors.primary} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
                     {isAr ? 'تفاصيل جدول أعمال الهيئة الخدمية' : 'Service Body Agenda Details'}
                   </AppText>
                 </View>
 
                 <View style={styles.detailGrid}>
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'الهيئة الخدمية:' : 'Service Body:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} weight="700">
+                    <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {selectedItem.service_body_name || (isAr ? 'مجلس الخدمة الإقليمية (RSC)' : 'Regional Service Committee')}
                     </AppText>
                   </View>
 
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'الحالة:' : 'Status:'}
                     </AppText>
                     <Badge
@@ -956,11 +1005,11 @@ export default function AgendasScreen() {
                   </View>
 
                   {selectedItem.meeting_date || selectedItem.created_at ? (
-                    <View style={styles.detailGridItemFull}>
-                      <AppText variant="caption" color={colors.textMuted} weight="700">
+                    <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? 'تاريخ الاجتماع / التوثيق:' : 'Meeting Date:'}
                       </AppText>
-                      <AppText variant="body" color={colors.textPrimary}>
+                      <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {String(selectedItem.meeting_date || selectedItem.created_at).slice(0, 10)}
                       </AppText>
                     </View>
@@ -968,12 +1017,12 @@ export default function AgendasScreen() {
                 </View>
 
                 {selectedItem.description || selectedItem.content ? (
-                  <View style={{ marginTop: 16 }}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={{ marginTop: 16, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'البيان / محضر الاجتماع:' : 'Minutes / Description:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22 }}>
-                      {selectedItem.description || selectedItem.content}
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22, textAlign: isAr ? 'right' : 'left' }}>
+                      {cleanHtmlText(selectedItem.description || selectedItem.content)}
                     </AppText>
                   </View>
                 ) : null}
@@ -981,24 +1030,24 @@ export default function AgendasScreen() {
                 {/* Voting Questions */}
                 {selectedItem.questions && Array.isArray(selectedItem.questions) && selectedItem.questions.length > 0 ? (
                   <View style={{ marginTop: 20 }}>
-                    <View style={styles.sectionHeaderRow}>
-                      <HelpCircle size={18} color={colors.accentDark} style={{ marginEnd: 8 }} />
+                    <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <HelpCircle size={18} color={colors.accentDark} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                       <AppText variant="h4" color={colors.textPrimary} weight="800">
                         {isAr ? 'بنود وأسئلة التصويت للأعضاء' : 'Voting Topics & Questions'}
                       </AppText>
                     </View>
                     {selectedItem.questions.map((q: any, qIdx: number) => (
-                      <View key={qIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}>
-                        <AppText variant="body" color={colors.primary} weight="700">
-                          {`${qIdx + 1}. ${q.title || q.question || (isAr ? 'بند للتصويت' : 'Voting Item')}`}
+                      <View key={qIdx} style={[styles.subTopicCard, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder, alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                        <AppText variant="body" color={colors.primary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                          {`${qIdx + 1}. ${cleanHtmlText(q.title || q.question) || (isAr ? 'بند للتصويت' : 'Voting Item')}`}
                         </AppText>
                         {q.description || q.details ? (
-                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4 }}>
-                            {q.description || q.details}
+                          <AppText variant="bodySmall" color={colors.textSecondary} style={{ marginTop: 4, textAlign: isAr ? 'right' : 'left' }}>
+                            {cleanHtmlText(q.description || q.details)}
                           </AppText>
                         ) : null}
                         {q.answer ? (
-                          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={{ marginTop: 6, flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center' }}>
                             <Badge label={isAr ? `القرار: ${q.answer}` : `Decision: ${q.answer}`} variant="accent" size="sm" />
                           </View>
                         ) : null}
@@ -1010,40 +1059,40 @@ export default function AgendasScreen() {
             ) : (
               /* COMMITTEE REPORT DETAILS */
               <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
-                <View style={styles.sectionHeaderRow}>
-                  <FileArchive size={18} color={colors.primary} style={{ marginEnd: 8 }} />
+                <View style={[styles.sectionHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <FileArchive size={18} color={colors.primary} style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                   <AppText variant="h4" color={colors.textPrimary} weight="800">
                     {isAr ? 'تفاصيل تقرير اللجنة الخدمية' : 'Committee Report Details'}
                   </AppText>
                 </View>
 
                 <View style={styles.detailGrid}>
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'اللجنة الخدمية:' : 'Service Committee:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} weight="700">
+                    <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {selectedItem?.committee_name || selectedItem?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee')}
                     </AppText>
                   </View>
 
-                  <View style={styles.detailGridItem}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'فترة التقرير:' : 'Reporting Period:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary}>
+                    <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {selectedItem?.period || (selectedItem?.created_at ? String(selectedItem.created_at).slice(0, 10) : (isAr ? 'الفترة الحالية' : 'Current'))}
                     </AppText>
                   </View>
                 </View>
 
                 {selectedItem?.description || selectedItem?.body || selectedItem?.content ? (
-                  <View style={{ marginTop: 16 }}>
-                    <AppText variant="caption" color={colors.textMuted} weight="700">
+                  <View style={{ marginTop: 16, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                    <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'ملخص الأنشطة والتقرير:' : 'Activity Summary & Report Body:'}
                     </AppText>
-                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22 }}>
-                      {selectedItem.description || selectedItem.body || selectedItem.content}
+                    <AppText variant="body" color={colors.textPrimary} style={{ marginTop: 4, lineHeight: 22, textAlign: isAr ? 'right' : 'left' }}>
+                      {cleanHtmlText(selectedItem.description || selectedItem.body || selectedItem.content)}
                     </AppText>
                   </View>
                 ) : null}

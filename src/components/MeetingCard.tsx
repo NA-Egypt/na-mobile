@@ -194,11 +194,11 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
         ]}
         accessible={true}
         accessibilityRole="text"
-        accessibilityLabel={`${groupName}, ${dayName} from ${startTime} to ${endTime}, in ${cityName} ${neighborhoodName}. ${isOpen ? 'Open meeting' : 'Closed meeting'}.`}
+        accessibilityLabel={`${groupName}, ${dayName} from ${startTime} to ${endTime}, in ${cityName} ${neighborhoodName}. ${type === 'open' ? 'Open meeting' : 'Closed meeting'}.`}
       >
-        {/* Top badges & Quick Actions */}
-        <View style={styles.headerRow}>
-          <View style={styles.badgeRow}>
+        {/* Card Header: Day & Online Status + Action Icons */}
+        <View style={[styles.headerRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.badgeRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
             <Badge label={dayName} variant="gold" size="sm" />
             <Badge
               label={isOpen ? t('meetings.type_open') : t('meetings.type_closed')}
@@ -209,11 +209,10 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
               label={getLanguageLabel()}
               variant="primary"
               size="sm"
-              icon={<Globe size={11} color={isDark ? '#38bdf8' : colors.primary} />}
             />
           </View>
 
-          <View style={styles.actionButtonsRow}>
+          <View style={[styles.actionButtonsRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
             {/* Reminder Bell Button */}
             <TouchableOpacity
               onPress={() => {
@@ -283,32 +282,32 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
           variant="h3"
           color={colors.textPrimary}
           weight="700"
-          style={styles.groupTitle}
+          style={[styles.groupTitle, { textAlign: isAr ? 'right' : 'left' }]}
         >
           {groupName}
         </AppText>
 
         {/* Location Row */}
-        <View style={styles.infoRow}>
-          <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+        <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
             <MapPin size={14} color={isDark ? '#22d3ee' : colors.accentDark} />
           </View>
           <AppText
             variant="body"
             color={colors.textSecondary}
             weight="500"
-            style={styles.infoText}
+            style={[styles.infoText, { textAlign: isAr ? 'right' : 'left' }]}
           >
             {cityName}{neighborhoodName ? ` • ${neighborhoodName}` : ''}
           </AppText>
         </View>
 
         {/* Time Row */}
-        <View style={styles.infoRow}>
-          <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+        <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
             <Clock size={14} color={isDark ? '#22d3ee' : colors.accentDark} />
           </View>
-          <View style={styles.timeContainer}>
+          <View style={[styles.timeContainer, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
             <AppText
               variant="body"
               color={colors.textPrimary}
@@ -336,16 +335,16 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
         {/* GSR (Group Service Representative) Info Row */}
         {(gsrName || gsrPhone) ? (
-          <View style={[styles.gsrContainer, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}>
-            <View style={styles.gsrLeft}>
-              <View style={[styles.gsrIconWrapper, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : colors.primaryLight + '25' }]}>
+          <View style={[styles.gsrContainer, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.gsrLeft, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.gsrIconWrapper, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : colors.primaryLight + '25', marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                 <UserCheck size={13} color={isDark ? '#38bdf8' : colors.primary} />
               </View>
-              <View style={styles.gsrTextCol}>
-                <AppText variant="caption" color={colors.textMuted} weight="600">
+              <View style={[styles.gsrTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                <AppText variant="caption" color={colors.textMuted} weight="600" style={{ textAlign: isAr ? 'right' : 'left' }}>
                   {isAr ? 'ممثل خدمة المجموعة (GSR)' : 'GSR Service Representative'}
                 </AppText>
-                <AppText variant="bodySmall" color={colors.textPrimary} weight="700">
+                <AppText variant="bodySmall" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                   {gsrName || (isAr ? 'خدمة المجموعة' : 'Group Service')}
                 </AppText>
               </View>
@@ -354,12 +353,12 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
             {gsrPhone ? (
               <TouchableOpacity
                 onPress={handleCallGsr}
-                style={[styles.gsrCallBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.2)' : colors.successLight }]}
+                style={[styles.gsrCallBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.2)' : colors.successLight, flexDirection: isAr ? 'row-reverse' : 'row' }]}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Call GSR ${gsrPhone}`}
               >
-                <Phone size={12} color={isDark ? '#34d399' : colors.success} style={{ marginEnd: 4 }} />
+                <Phone size={12} color={isDark ? '#34d399' : colors.success} style={{ marginEnd: isAr ? 0 : 4, marginStart: isAr ? 4 : 0 }} />
                 <AppText variant="caption" color={isDark ? '#34d399' : colors.success} weight="700">
                   {gsrPhone}
                 </AppText>
@@ -370,15 +369,15 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
         {/* Topic Row */}
         {topicName ? (
-          <View style={styles.infoRow}>
-            <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+          <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
               <Tag size={13} color={isDark ? '#22d3ee' : colors.accentDark} />
             </View>
             <AppText
               variant="body"
               color={colors.textSecondary}
               weight="600"
-              style={styles.infoText}
+              style={[styles.infoText, { textAlign: isAr ? 'right' : 'left' }]}
             >
               {topicName}
             </AppText>
@@ -387,8 +386,8 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
         {/* Optional Notes */}
         {notes ? (
-          <View style={[styles.notesContainer, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid }]}>
-            <AppText variant="bodySmall" color={colors.textSecondary} style={styles.notesText}>
+          <View style={[styles.notesContainer, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSolid, alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+            <AppText variant="bodySmall" color={colors.textSecondary} style={[styles.notesText, { textAlign: isAr ? 'right' : 'left' }]}>
               {notes}
             </AppText>
           </View>
@@ -396,13 +395,13 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
         {/* Map Directions Button */}
         <TouchableOpacity
-          style={[styles.mapButton, { backgroundColor: isDark ? colors.primaryDark : colors.primary }]}
+          style={[styles.mapButton, { backgroundColor: isDark ? colors.primaryDark : colors.primary, flexDirection: isAr ? 'row-reverse' : 'row' }]}
           onPress={handleOpenMap}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={t('meetings.directions')}
         >
-          <Navigation size={15} color="#ffffff" style={{ marginEnd: spacing.xs + 2 }} />
+          <Navigation size={15} color="#ffffff" style={{ marginEnd: isAr ? 0 : spacing.xs + 2, marginStart: isAr ? spacing.xs + 2 : 0 }} />
           <AppText variant="label" color="#ffffff" weight="700">
             {t('meetings.directions')}
           </AppText>

@@ -22,6 +22,7 @@ import {
   ExternalLink,
   ShieldCheck,
   HeartHandshake,
+  Globe,
 } from 'lucide-react-native';
 import { homeApi } from '../api/home';
 import { apiClient } from '../api/client';
@@ -37,26 +38,26 @@ interface HelplineModalProps {
 
 const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
   {
-    region: 'Cairo & Giza',
-    region_ar: 'القاهرة والجيزة',
+    region: 'Cairo & Giza Area',
+    region_ar: 'منطقة القاهرة والجيزة',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
   },
   {
-    region: 'Alexandria & North Coast',
-    region_ar: 'الإسكندرية والساحل الشمالي',
+    region: 'Alexandria & North Coast Area',
+    region_ar: 'منطقة الإسكندرية والساحل الشمالي',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
   },
   {
-    region: 'Delta & Canal Cities',
-    region_ar: 'الدلتا ومدن القناة (طنطا، المنصورة، بورسعيد، السويس)',
+    region: 'Delta & Canal Area',
+    region_ar: 'منطقة الدلتا ومدن القناة',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
   },
   {
-    region: 'Upper Egypt & Red Sea',
-    region_ar: 'صعيد مصر والبحر الأحمر (أسيوط، سوهاج، الأقصر، أسوان، الغردقة)',
+    region: 'Upper Egypt & Red Sea Area',
+    region_ar: 'منطقة صعيد مصر والبحر الأحمر',
     phones: ['+201006979198', '+201060933888'],
     whatsapp: 'https://wa.me/201060933888',
   },
@@ -67,7 +68,7 @@ const OFFICIAL_DEFAULT_SOCIAL: SocialLinks = {
   instagram: 'https://www.instagram.com/narcoticsanonymousegy',
   tiktok: 'https://www.tiktok.com/@narcoticsanonymousegypt',
   whatsapp: 'https://wa.me/201060933888',
-  email: 'pr@naegypt.org',
+  email: 'hello@naegypt.org',
 };
 
 export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }) => {
@@ -170,16 +171,16 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder }]}>
-          <View style={styles.headerTitleRow}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.accentLight }]}>
+        <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.headerTitleRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
               <PhoneCall size={18} color={colors.accentDark} />
             </View>
-            <View>
-              <AppText variant="h3" color={colors.textPrimary} weight="800">
+            <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+              <AppText variant="h3" color={colors.textPrimary} weight="800" style={{ textAlign: isAr ? 'right' : 'left' }}>
                 {isAr ? 'خطوط المساعدة والتواصل' : 'Helplines & Official Channels'}
               </AppText>
-              <AppText variant="caption" color={colors.textSecondary}>
+              <AppText variant="caption" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                 {isAr ? 'نحن متواجدون لمساعدتك ومساعدة من تحب' : 'We are here to help you and your loved ones'}
               </AppText>
             </View>
@@ -207,17 +208,18 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
               {
                 backgroundColor: colors.primaryDark,
                 borderRadius: borderRadius.card,
+                alignItems: isAr ? 'flex-end' : 'flex-start',
               },
             ]}
           >
             <HeartHandshake size={28} color={colors.accent} style={{ marginBottom: 6 }} />
-            <AppText variant="body" color="#ffffff" weight="700" style={styles.bannerText}>
+            <AppText variant="body" color="#ffffff" weight="700" style={[styles.bannerText, { textAlign: isAr ? 'right' : 'left' }]}>
               {isAr
                 ? 'هل تعاني أو يعاني شخص قريب منك من مشكلة مع المخدرات؟ لست وحدك، زمالة NA تمد لك يد المساعدة بكل سرية ومجانية.'
                 : 'Are you or a loved one struggling with drugs? You are not alone. NA offers confidential, free support.'}
             </AppText>
-            <View style={styles.bannerBadge}>
-              <ShieldCheck size={14} color={colors.accent} style={{ marginEnd: 4 }} />
+            <View style={[styles.bannerBadge, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <ShieldCheck size={14} color={colors.accent} style={{ marginEnd: isAr ? 0 : 4, marginStart: isAr ? 4 : 0 }} />
               <AppText variant="caption" color="rgba(224, 248, 252, 0.85)" weight="700">
                 {isAr ? 'السرية التامة مضمونة دائماً' : 'Complete Confidentiality Guaranteed'}
               </AppText>
@@ -225,7 +227,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
           </View>
 
           {/* Regional Helplines Section */}
-          <AppText variant="h4" color={colors.textPrimary} weight="800" style={styles.sectionTitle}>
+          <AppText variant="h4" color={colors.textPrimary} weight="800" style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left' }]}>
             {isAr ? 'أرقام خطوط المساعدة حسب المحافظة' : 'Regional Helpline Numbers'}
           </AppText>
 
@@ -250,7 +252,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                   },
                 ]}
               >
-                <View style={styles.helplineHeader}>
+                <View style={[styles.helplineHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                   <AppText variant="h4" color={colors.textPrimary} weight="700">
                     {isAr ? item.region_ar || item.region : item.region}
                   </AppText>
@@ -266,11 +268,11 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                     item.phones.map((phone, pIdx) => (
                       <TouchableOpacity
                         key={pIdx}
-                        style={[styles.phoneButton, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder }]}
+                        style={[styles.phoneButton, { backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}
                         onPress={() => handleCall(phone)}
                         activeOpacity={0.8}
                       >
-                        <View style={[styles.btnIconCircle, { backgroundColor: colors.accentLight }]}>
+                        <View style={[styles.btnIconCircle, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                           <PhoneCall size={14} color={colors.accentDark} />
                         </View>
                         <AppText variant="body" color={colors.primary} weight="700" style={styles.phoneText}>
@@ -280,7 +282,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                       </TouchableOpacity>
                     ))
                   ) : (
-                    <AppText variant="caption" color={colors.textSecondary}>
+                    <AppText variant="caption" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                       {isAr ? 'لا يوجد رقم هاتف مسجل لهذه المنطقة' : 'No phone number listed for this region'}
                     </AppText>
                   )}
@@ -288,11 +290,11 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
                 {item.whatsapp ? (
                   <TouchableOpacity
-                    style={[styles.whatsappButton, { backgroundColor: '#25D366' }]}
+                    style={[styles.whatsappButton, { backgroundColor: '#25D366', flexDirection: isAr ? 'row-reverse' : 'row' }]}
                     onPress={() => handleWhatsApp(item.whatsapp)}
                     activeOpacity={0.85}
                   >
-                    <MessageCircle size={18} color="#ffffff" style={{ marginEnd: 8 }} />
+                    <MessageCircle size={18} color="#ffffff" style={{ marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }} />
                     <AppText variant="body" color="#ffffff" weight="700">
                       {isAr ? 'تواصل عبر واتساب فوراً' : 'Chat on WhatsApp'}
                     </AppText>
@@ -322,7 +324,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
           )}
 
           {/* Official Social Media Channels */}
-          <AppText variant="h4" color={colors.textPrimary} weight="800" style={[styles.sectionTitle, { marginTop: 16 }]}>
+          <AppText variant="h4" color={colors.textPrimary} weight="800" style={[styles.sectionTitle, { marginTop: 16, textAlign: isAr ? 'right' : 'left' }]}>
             {isAr ? 'القنوات والمنصات الرسمية' : 'Official Fellowship Channels'}
           </AppText>
 
@@ -339,14 +341,14 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
           >
             {socialLinks?.facebook ? (
               <TouchableOpacity
-                style={styles.socialItem}
+                style={[styles.socialItem, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
                 onPress={() => handleOpenLink(socialLinks.facebook)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.socialIconBox, { backgroundColor: '#1877F2' }]}>
+                <View style={[styles.socialIconBox, { backgroundColor: '#1877F2', marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
                   <Share2 size={16} color="#ffffff" />
                 </View>
-                <View style={styles.socialTextCol}>
+                <View style={[styles.socialTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                   <AppText variant="body" color={colors.textPrimary} weight="700">
                     Facebook
                   </AppText>
@@ -360,14 +362,14 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
             {socialLinks?.instagram ? (
               <TouchableOpacity
-                style={styles.socialItem}
+                style={[styles.socialItem, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
                 onPress={() => handleOpenLink(socialLinks.instagram)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.socialIconBox, { backgroundColor: '#E4405F' }]}>
-                  <Share2 size={16} color="#ffffff" />
+                <View style={[styles.socialIconBox, { backgroundColor: '#E4405F', marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
+                  <Globe size={16} color="#ffffff" />
                 </View>
-                <View style={styles.socialTextCol}>
+                <View style={[styles.socialTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                   <AppText variant="body" color={colors.textPrimary} weight="700">
                     Instagram
                   </AppText>
@@ -381,14 +383,14 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
             {socialLinks?.email ? (
               <TouchableOpacity
-                style={styles.socialItem}
+                style={[styles.socialItem, { flexDirection: isAr ? 'row-reverse' : 'row', borderBottomWidth: 0 }]}
                 onPress={() => Linking.openURL(`mailto:${socialLinks.email}`)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.socialIconBox, { backgroundColor: colors.primary }]}>
+                <View style={[styles.socialIconBox, { backgroundColor: colors.primary, marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
                   <Mail size={16} color="#ffffff" />
                 </View>
-                <View style={styles.socialTextCol}>
+                <View style={[styles.socialTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                   <AppText variant="body" color={colors.textPrimary} weight="700">
                     {isAr ? 'البريد الإلكتروني للجنة العلاقات العامة' : 'PR Committee Email'}
                   </AppText>

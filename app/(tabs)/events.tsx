@@ -402,13 +402,14 @@ export default function EventsScreen() {
                 },
               ]}
             >
-              <View style={styles.monthHeaderRow}>
+              <View style={[styles.monthHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
-                  onPress={isAr ? nextMonth : prevMonth}
+                  onPress={prevMonth}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={[styles.navArrowBtn, { backgroundColor: colors.bgSecondary }]}
+                  accessibilityLabel={isAr ? 'الشهر السابق' : 'Previous Month'}
                 >
-                  <ChevronRight size={20} color={colors.textPrimary} />
+                  {isAr ? <ChevronRight size={20} color={colors.textPrimary} /> : <ChevronLeft size={20} color={colors.textPrimary} />}
                 </TouchableOpacity>
 
                 <AppText variant="h3" color={colors.textPrimary} weight="700">
@@ -416,16 +417,17 @@ export default function EventsScreen() {
                 </AppText>
 
                 <TouchableOpacity
-                  onPress={isAr ? prevMonth : nextMonth}
+                  onPress={nextMonth}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={[styles.navArrowBtn, { backgroundColor: colors.bgSecondary }]}
+                  accessibilityLabel={isAr ? 'الشهر التالي' : 'Next Month'}
                 >
-                  <ChevronLeft size={20} color={colors.textPrimary} />
+                  {isAr ? <ChevronLeft size={20} color={colors.textPrimary} /> : <ChevronRight size={20} color={colors.textPrimary} />}
                 </TouchableOpacity>
               </View>
 
               {/* Day of Week Headers */}
-              <View style={[styles.dayLabelsRow, { borderColor: colors.borderSubtle }]}>
+              <View style={[styles.dayLabelsRow, { borderColor: colors.borderSubtle, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 {(isAr ? dayLabelsAr : dayLabelsEn).map((lbl, idx) => (
                   <AppText key={idx} variant="caption" color={colors.textMuted} weight="700" style={styles.dayLabelText}>
                     {lbl}
@@ -434,7 +436,7 @@ export default function EventsScreen() {
               </View>
 
               {/* Calendar Grid */}
-              <View style={styles.daysGrid}>
+              <View style={[styles.daysGrid, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 {Array.from({ length: firstDayOfWeek }).map((_, i) => (
                   <View key={`empty-${i}`} style={styles.dayCell} />
                 ))}
@@ -490,7 +492,7 @@ export default function EventsScreen() {
 
             {/* Selected Day Events Section */}
             <View style={styles.dayAgendaSection}>
-              <View style={styles.dayAgendaHeaderRow}>
+              <View style={[styles.dayAgendaHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 <AppText variant="h4" color={colors.textPrimary} weight="700">
                   {isAr ? `أجندة يوم: ${selectedDateStr}` : `Schedule for ${selectedDateStr}`}
                 </AppText>
@@ -523,37 +525,37 @@ export default function EventsScreen() {
                       },
                     ]}
                   >
-                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.cardTitle}>
+                    <AppText variant="h3" color={colors.textPrimary} weight="700" style={[styles.cardTitle, { textAlign: isAr ? 'right' : 'left' }]}>
                       {item.title}
                     </AppText>
 
                     {item.organizer ? (
-                      <View style={styles.infoRow}>
-                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                           <UserCheck size={14} color={colors.accentDark} />
                         </View>
-                        <AppText variant="bodySmall" color={colors.textSecondary}>
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                           {isAr ? `المنظم: ${item.organizer}` : `Organizer: ${item.organizer}`}
                         </AppText>
                       </View>
                     ) : null}
 
                     {item.description ? (
-                      <AppText variant="bodySmall" color={colors.textSecondary} style={styles.cardDescription}>
+                      <AppText variant="bodySmall" color={colors.textSecondary} style={[styles.cardDescription, { textAlign: isAr ? 'right' : 'left' }]}>
                         {item.description}
                       </AppText>
                     ) : null}
 
                     {item.location ? (
                       <TouchableOpacity
-                        style={styles.infoRow}
+                        style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
                         onPress={() => handleOpenMap(item.location || '', item.title || '')}
                         activeOpacity={0.7}
                       >
-                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                        <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                           <MapPin size={14} color={colors.accentDark} />
                         </View>
-                        <AppText variant="bodySmall" color={colors.accentDark} style={styles.locationLink}>
+                        <AppText variant="bodySmall" color={colors.accentDark} style={[styles.locationLink, { textAlign: isAr ? 'right' : 'left' }]}>
                           {item.location}
                         </AppText>
                       </TouchableOpacity>
@@ -621,7 +623,7 @@ export default function EventsScreen() {
                     },
                   ]}
                 >
-                  <View style={styles.badgeRow}>
+                  <View style={[styles.badgeRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                     {formattedDate ? (
                       <Badge
                         label={formattedDate}
@@ -641,37 +643,37 @@ export default function EventsScreen() {
                     ) : null}
                   </View>
 
-                  <AppText variant="h3" color={colors.textPrimary} weight="700" style={styles.cardTitle}>
+                  <AppText variant="h3" color={colors.textPrimary} weight="700" style={[styles.cardTitle, { textAlign: isAr ? 'right' : 'left' }]}>
                     {item.title}
                   </AppText>
 
                   {item.organizer ? (
-                    <View style={styles.infoRow}>
-                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                    <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                         <UserCheck size={14} color={colors.accentDark} />
                       </View>
-                      <AppText variant="bodySmall" color={colors.textSecondary}>
+                      <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? `الجهة المنظمة: ${item.organizer}` : `Organizer: ${item.organizer}`}
                       </AppText>
                     </View>
                   ) : null}
 
                   {item.description ? (
-                    <AppText variant="bodySmall" color={colors.textSecondary} style={styles.cardDescription}>
+                    <AppText variant="bodySmall" color={colors.textSecondary} style={[styles.cardDescription, { textAlign: isAr ? 'right' : 'left' }]}>
                       {item.description}
                     </AppText>
                   ) : null}
 
                   {item.location ? (
                     <TouchableOpacity
-                      style={styles.infoRow}
+                      style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
                       onPress={() => handleOpenMap(item.location || '', item.title || '')}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight }]}>
+                      <View style={[styles.iconWrapper, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 8, marginStart: isAr ? 8 : 0 }]}>
                         <MapPin size={14} color={colors.accentDark} />
                       </View>
-                      <AppText variant="bodySmall" color={colors.accentDark} style={styles.locationLink}>
+                      <AppText variant="bodySmall" color={colors.accentDark} style={[styles.locationLink, { textAlign: isAr ? 'right' : 'left' }]}>
                         {item.location}
                       </AppText>
                     </TouchableOpacity>
