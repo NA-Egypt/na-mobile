@@ -188,9 +188,20 @@ Retrieves platform statistics counter (weekly meetings, groups, governorates, ev
 
 ### 3.1 Meetings (`/api/v1/meetings`)
 
+#### Prioritized URL Resolution Logic
+Both `location_url` and `meeting_url` fields in `MeetingResource` are resolved following a prioritized fallback hierarchy:
+1. `$meeting->location_url`
+2. `$meeting->meeting_url`
+3. `$group->location`
+4. `$directOnlineGroup->location`
+5. `$directOnlineGroup->meeting_url`
+6. `$directOnlineGroup->zoom_url`
+7. `$directOnlineGroup->url`
+8. `$directOnlineGroup->link`
+
 #### `GET /api/v1/meetings`
 Query parameters for filtering meetings:
-- `day`: Day name in Arabic (e.g., `الاثنين`) or English (`Monday`), or `all`
+- `day`: Day name in Arabic (e.g., `الجمعة`) or English (`Friday`), or `all`
 - `city`: City name (`ar_name` or `en_name`)
 - `neighborhood`: Neighborhood name (`ar_name` or `en_name`)
 - `serviceBody`: Service Body name (`ar_name` or `en_name`)
@@ -199,8 +210,6 @@ Query parameters for filtering meetings:
 - `search`: Keyword string matching group name or address
 - `virtualOnly`: `1` or `true` to filter online/virtual meetings
 - `englishOnly`: `1` or `true` to filter meetings conducted in English
-- `recurrence`: `weekly` or `monthly` or specific occurrence tag (`1st`, `2nd`, `3rd`, `4th`, `5th`, `last`)
-- `businessMeetingsOnly`: `1` or `true` for Group Business Meetings
 
 **Response (200 OK):**
 ```json
@@ -208,29 +217,36 @@ Query parameters for filtering meetings:
   "data": [
     {
       "id": 10,
-      "group_id": 3,
       "day_id": 1,
-      "start_time": "19:30:00",
-      "end_time": "21:00:00",
+      "group_id": 3,
+      "direct_online_group_id": null,
       "type": "open",
       "lang": "arabic",
       "status": "available",
+      "start_time": "19:30:00",
+      "end_time": "21:00:00",
+      "formatted_start_time": "07:30 PM",
+      "formatted_end_time": "09:00 PM",
+      "duration": 90,
       "notes": "Wheelchair accessible",
-      "group": {
-        "id": 3,
-        "ar_name": "مجموعة الأمل",
-        "en_name": "Hope Group",
-        "location": "30.0444,31.2357",
-        "ar_address": "وسط البلد، القاهرة",
-        "en_address": "Downtown, Cairo",
-        "neighborhood": {
-          "id": 1,
-          "ar_name": "وسط البلد",
-          "en_name": "Downtown",
-          "city": { "id": 1, "ar_name": "القاهرة", "en_name": "Cairo" }
-        }
-      },
-      "day": { "id": 1, "ar_name": "الاثنين", "en_name": "Monday" },
+      "recurrence": ["weekly"],
+
+      "group_name_ar": "مجموعة الأمل",
+      "group_name_en": "Hope Group",
+      "group_type": "in_person",
+      "address_ar": "وسط البلد، القاهرة",
+      "address_en": "Downtown, Cairo",
+      "location_url": "https://maps.google.com/?q=30.0444,31.2357",
+      "meeting_url": "https://maps.google.com/?q=30.0444,31.2357",
+
+      "neighborhood_id": 1,
+      "neighborhood_name_ar": "وسط البلد",
+      "neighborhood_name_en": "Downtown",
+      "city_id": 1,
+      "city_name_ar": "القاهرة",
+      "city_name_en": "Cairo",
+
+      "day": { "id": 1, "ar_name": "السبت", "en_name": "Saturday" },
       "topics": [{ "id": 1, "ar_name": "خطوة أولى", "en_name": "Step 1" }],
       "options": [{ "id": 2, "ar_name": "مفتوح", "en_name": "Open" }]
     }
