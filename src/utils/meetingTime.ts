@@ -53,7 +53,15 @@ export function isOnlineMeeting(meeting: {
   if (!meeting) return false;
 
   const gType = (meeting.groupType || '').toLowerCase().trim();
-  if (gType === 'online' || gType === 'virtual' || gType === 'direct_online') {
+  if (
+    gType === 'online' ||
+    gType === 'virtual' ||
+    gType === 'direct_online' ||
+    gType.includes('اونلاين') ||
+    gType.includes('أونلاين') ||
+    gType.includes('اون لاين') ||
+    gType.includes('عبر الإنترنت')
+  ) {
     return true;
   }
 
