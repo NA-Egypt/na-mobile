@@ -29,6 +29,7 @@ interface FilterModalProps {
   onApplyFilters: (newFilters: FilterOptions) => void;
   cities: Array<{ id: string; name: string }>;
   days: Array<{ id: string; name: string }>;
+  isOnlineTab?: boolean;
 }
 
 export const FilterModal: React.FC<FilterModalProps> = ({
@@ -38,6 +39,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   onApplyFilters,
   cities,
   days,
+  isOnlineTab = false,
 }) => {
   const { colors, borderRadius, shadows } = useAppTheme();
   const { t, i18n } = useTranslation();
@@ -223,112 +225,116 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               })}
             </View>
 
-            {/* 2. City */}
-            <AppText
-              variant="h4"
-              color={colors.textPrimary}
-              weight="700"
-              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
-            >
-              {isAr ? 'المدينة / المحافظة' : 'City / Governorate'}
-            </AppText>
-            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: localFilters.cityId === null ? colors.accent : colors.bgSecondary,
-                    borderColor: localFilters.cityId === null ? colors.accent : colors.borderSolid,
-                    borderRadius: borderRadius.pill,
-                  },
-                ]}
-                onPress={() => {
-                  haptic.selection();
-                  setLocalFilters({ ...localFilters, cityId: null });
-                }}
-              >
+            {/* 2. City (In-Person only) */}
+            {!isOnlineTab && (
+              <>
                 <AppText
-                  variant="label"
-                  color={localFilters.cityId === null ? colors.primaryDark : colors.textSecondary}
-                  weight={localFilters.cityId === null ? '700' : '500'}
+                  variant="h4"
+                  color={colors.textPrimary}
+                  weight="700"
+                  style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
                 >
-                  {isAr ? 'كل المدن' : 'All Cities'}
+                  {isAr ? 'المدينة / المحافظة' : 'City / Governorate'}
                 </AppText>
-              </TouchableOpacity>
-              {cities.map((c) => {
-                const isSelected = String(localFilters.cityId) === String(c.id);
-                return (
+                <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                   <TouchableOpacity
-                    key={c.id}
                     style={[
                       styles.chip,
                       {
-                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
-                        borderColor: isSelected ? colors.accent : colors.borderSolid,
+                        backgroundColor: localFilters.cityId === null ? colors.accent : colors.bgSecondary,
+                        borderColor: localFilters.cityId === null ? colors.accent : colors.borderSolid,
                         borderRadius: borderRadius.pill,
                       },
                     ]}
                     onPress={() => {
                       haptic.selection();
-                      setLocalFilters({ ...localFilters, cityId: String(c.id) });
+                      setLocalFilters({ ...localFilters, cityId: null });
                     }}
                   >
                     <AppText
                       variant="label"
-                      color={isSelected ? colors.primaryDark : colors.textSecondary}
-                      weight={isSelected ? '700' : '500'}
+                      color={localFilters.cityId === null ? colors.primaryDark : colors.textSecondary}
+                      weight={localFilters.cityId === null ? '700' : '500'}
                     >
-                      {c.name}
+                      {isAr ? 'كل المدن' : 'All Cities'}
                     </AppText>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                  {cities.map((c) => {
+                    const isSelected = String(localFilters.cityId) === String(c.id);
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                            borderColor: isSelected ? colors.accent : colors.borderSolid,
+                            borderRadius: borderRadius.pill,
+                          },
+                        ]}
+                        onPress={() => {
+                          haptic.selection();
+                          setLocalFilters({ ...localFilters, cityId: String(c.id) });
+                        }}
+                      >
+                        <AppText
+                          variant="label"
+                          color={isSelected ? colors.primaryDark : colors.textSecondary}
+                          weight={isSelected ? '700' : '500'}
+                        >
+                          {c.name}
+                        </AppText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-            {/* 3. Meeting Type */}
-            <AppText
-              variant="h4"
-              color={colors.textPrimary}
-              weight="700"
-              style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
-            >
-              {isAr ? 'نوع الحضور' : 'Attendance Type'}
-            </AppText>
-            <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-              {[
-                { id: null, label: isAr ? 'الكل' : 'All' },
-                { id: 'in_person', label: isAr ? 'حضوري' : 'In-Person' },
-                { id: 'online', label: isAr ? 'أونلاين' : 'Online' },
-                { id: 'hybrid', label: isAr ? 'مختلط' : 'Hybrid' },
-              ].map((opt) => {
-                const isSelected = localFilters.groupType === opt.id;
-                return (
-                  <TouchableOpacity
-                    key={String(opt.id)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
-                        borderColor: isSelected ? colors.accent : colors.borderSolid,
-                        borderRadius: borderRadius.pill,
-                      },
-                    ]}
-                    onPress={() => {
-                      haptic.selection();
-                      setLocalFilters({ ...localFilters, groupType: opt.id });
-                    }}
-                  >
-                    <AppText
-                      variant="label"
-                      color={isSelected ? colors.primaryDark : colors.textSecondary}
-                      weight={isSelected ? '700' : '500'}
-                    >
-                      {opt.label}
-                    </AppText>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                {/* 3. Meeting Type */}
+                <AppText
+                  variant="h4"
+                  color={colors.textPrimary}
+                  weight="700"
+                  style={[styles.sectionTitle, { textAlign: isAr ? 'right' : 'left', writingDirection: isAr ? 'rtl' : 'ltr' }]}
+                >
+                  {isAr ? 'نوع الحضور' : 'Attendance Type'}
+                </AppText>
+                <View style={[styles.chipRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  {[
+                    { id: null, label: isAr ? 'الكل' : 'All' },
+                    { id: 'in_person', label: isAr ? 'حضوري' : 'In-Person' },
+                    { id: 'online', label: isAr ? 'أونلاين' : 'Online' },
+                    { id: 'hybrid', label: isAr ? 'مختلط' : 'Hybrid' },
+                  ].map((opt) => {
+                    const isSelected = localFilters.groupType === opt.id;
+                    return (
+                      <TouchableOpacity
+                        key={String(opt.id)}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? colors.accent : colors.bgSecondary,
+                            borderColor: isSelected ? colors.accent : colors.borderSolid,
+                            borderRadius: borderRadius.pill,
+                          },
+                        ]}
+                        onPress={() => {
+                          haptic.selection();
+                          setLocalFilters({ ...localFilters, groupType: opt.id });
+                        }}
+                      >
+                        <AppText
+                          variant="label"
+                          color={isSelected ? colors.primaryDark : colors.textSecondary}
+                          weight={isSelected ? '700' : '500'}
+                        >
+                          {opt.label}
+                        </AppText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
             {/* 4. Language */}
             <AppText

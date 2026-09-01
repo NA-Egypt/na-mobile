@@ -264,7 +264,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {user.name || (isAr ? 'خادم موثوق' : 'Trusted Servant')}
                           </AppText>
                           <Badge
-                            label={isAr ? 'خادم معتمد' : 'Servant'}
+                            label={isAr ? 'خادم مؤتمن' : 'Servant'}
                             variant="accent"
                             size="sm"
                           />

@@ -23,6 +23,8 @@ import {
   RotateCcw,
   Compass,
   SlidersHorizontal,
+  Video,
+  Globe,
 } from 'lucide-react-native';
 import { database } from '../../src/database';
 import Meeting from '../../src/database/models/Meeting';
@@ -54,6 +56,11 @@ import {
   getMeetingCoordinates,
   EGYPT_CENTROIDS,
 } from '../../src/utils/location';
+import {
+  isOnlineMeeting,
+  sortOnlineMeetings,
+  getMeetingTimeStatus,
+} from '../../src/utils/meetingTime';
 
 const EGYPT_CITY_CENTROID_OPTIONS = [
   { key: 'cairo', ar: 'القاهرة', en: 'Cairo' },
@@ -83,7 +90,11 @@ export default function MeetingsScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const { colors, borderRadius, shadows, isDark } = useAppTheme();
-  const params = useLocalSearchParams<{ nearest?: string }>();
+  const params = useLocalSearchParams<{ nearest?: string; tab?: string }>();
+
+  const [activeTab, setActiveTab] = useState<'in_person' | 'online'>(
+    params?.tab === 'online' ? 'online' : 'in_person'
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -91,7 +102,6 @@ export default function MeetingsScreen() {
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [frontpageStats, setFrontpageStats] = useState<FrontpageStats | null>(null);
 
-  // Nearest Mode States
   const [isNearestMode, setIsNearestMode] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [userCoordinates, setUserCoordinates] = useState<GeoCoordinates | null>(null);
@@ -212,7 +222,6 @@ export default function MeetingsScreen() {
       setIsNearestMode(true);
       haptic.success();
     } else {
-      // Graceful fallback: set default Cairo center and prompt user to pick their city
       setUserCoordinates(EGYPT_CENTROIDS.cairo);
       setSelectedCityCenter(isAr ? 'القاهرة (مركز تقريبي)' : 'Cairo (Approx. Center)');
       setIsNearestMode(true);
@@ -258,9 +267,9 @@ export default function MeetingsScreen() {
     return () => subscription.unsubscribe();
   }, [loadDataFromLocalDB]);
 
-  // Handle URL param ?nearest=1 when arriving from Home screen
   useEffect(() => {
     if (params?.nearest === '1' || params?.nearest === 'true') {
+      setActiveTab('in_person');
       handleActivateNearestMode();
     }
   }, [params?.nearest, handleActivateNearestMode]);
@@ -273,7 +282,7 @@ export default function MeetingsScreen() {
       homeApi.getStats().then((st) => setFrontpageStats(st)),
     ]);
     await loadDataFromLocalDB();
-    if (isNearestMode && !selectedCityCenter) {
+    if (activeTab === 'in_person' && isNearestMode && !selectedCityCenter) {
       const loc = await requestDeviceLocation();
       if (loc.coordinates) {
         setUserCoordinates(loc.coordinates);
@@ -283,7 +292,7 @@ export default function MeetingsScreen() {
   };
 
   const getTodayDayNames = (): { ar: string; en: string } => {
-    const dayIdx = new Date().getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+    const dayIdx = new Date().getDay();
     const map: Record<number, { ar: string; en: string }> = {
       6: { ar: 'السبت', en: 'Saturday' },
       0: { ar: 'الأحد', en: 'Sunday' },
@@ -296,21 +305,39 @@ export default function MeetingsScreen() {
     return map[dayIdx] || { ar: 'السبت', en: 'Saturday' };
   };
 
-  // Filter calculation & Distance Ranking
+  const totalInPersonCount = useMemo(() => {
+    return meetings.filter((m) => !isOnlineMeeting(m)).length;
+  }, [meetings]);
+
+  const totalOnlineCount = useMemo(() => {
+    return meetings.filter((m) => isOnlineMeeting(m)).length;
+  }, [meetings]);
+
+  const hasLiveOnlineMeetings = useMemo(() => {
+    const now = new Date();
+    return meetings.some((m) => isOnlineMeeting(m) && getMeetingTimeStatus(m, now).isLive);
+  }, [meetings]);
+
   const filteredMeetings = useMemo(() => {
-    const baseList = meetings.filter((m) => {
-      const query = searchQuery.trim().toLowerCase();
+    const tabFiltered = meetings.filter((m) => {
+      const isOnline = isOnlineMeeting(m);
+      return activeTab === 'online' ? isOnline : !isOnline;
+    });
+
+    const query = searchQuery.trim().toLowerCase();
+    const baseList = tabFiltered.filter((m) => {
       const matchesSearch =
         query === '' ||
         m.groupName.toLowerCase().includes(query) ||
         m.cityName.toLowerCase().includes(query) ||
         m.neighborhoodName.toLowerCase().includes(query) ||
-        m.address.toLowerCase().includes(query);
+        m.address.toLowerCase().includes(query) ||
+        (m.notes && m.notes.toLowerCase().includes(query));
 
       const matchesDay = !filters.dayId || String(m.dayId) === String(filters.dayId);
 
       const matchesCity = (() => {
-        if (!filters.cityId) return true;
+        if (activeTab === 'online' || !filters.cityId) return true;
         const selectedCity = cities.find((c) => c.id === filters.cityId);
         if (!selectedCity) return true;
         return (
@@ -319,7 +346,10 @@ export default function MeetingsScreen() {
         );
       })();
 
-      const matchesGroupType = !filters.groupType || m.groupType === filters.groupType;
+      const matchesGroupType =
+        activeTab === 'online'
+          ? true
+          : !filters.groupType || m.groupType === filters.groupType;
 
       const matchesLang =
         !filters.lang ||
@@ -333,53 +363,53 @@ export default function MeetingsScreen() {
       return matchesSearch && matchesDay && matchesCity && matchesGroupType && matchesLang && matchesType;
     });
 
-    if (!isNearestMode || !userCoordinates) {
-      return baseList;
+    if (activeTab === 'online') {
+      return sortOnlineMeetings(baseList, new Date());
     }
 
-    // Attach calculated distance to each meeting
-    const withDistance = baseList.map((m) => {
-      const coords = getMeetingCoordinates(m);
-      const distanceKm = calculateHaversineDistance(
-        userCoordinates.latitude,
-        userCoordinates.longitude,
-        coords.latitude,
-        coords.longitude
-      );
-      return { ...m, distanceKm };
-    });
-
-    const todayNames = getTodayDayNames();
-
-    if (nearestDayScope === 'today') {
-      const todayMeetings = withDistance.filter((m) => {
-        const dayNameLower = (m.dayName || '').toLowerCase();
-        return (
-          dayNameLower.includes(todayNames.ar.toLowerCase()) ||
-          dayNameLower.includes(todayNames.en.toLowerCase())
+    if (isNearestMode && userCoordinates) {
+      const withDistance = baseList.map((m) => {
+        const coords = getMeetingCoordinates(m);
+        const distanceKm = calculateHaversineDistance(
+          userCoordinates.latitude,
+          userCoordinates.longitude,
+          coords.latitude,
+          coords.longitude
         );
+        return { ...m, distanceKm };
       });
 
-      if (todayMeetings.length > 0) {
-        return todayMeetings.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+      const todayNames = getTodayDayNames();
+
+      if (nearestDayScope === 'today') {
+        const todayMeetings = withDistance.filter((m) => {
+          const dayNameLower = (m.dayName || '').toLowerCase();
+          return (
+            dayNameLower.includes(todayNames.ar.toLowerCase()) ||
+            dayNameLower.includes(todayNames.en.toLowerCase())
+          );
+        });
+
+        if (todayMeetings.length > 0) {
+          return todayMeetings.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+        }
       }
+
+      return withDistance.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
     }
 
-    // Fallback or All days scope: sort by physical proximity
-    return withDistance.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
-  }, [meetings, searchQuery, filters, cities, isNearestMode, userCoordinates, nearestDayScope]);
+    return baseList;
+  }, [meetings, activeTab, searchQuery, filters, cities, isNearestMode, userCoordinates, nearestDayScope]);
 
-  // Closest single meeting for Hero Spotlight
   const closestMeeting = useMemo(() => {
-    if (!isNearestMode || filteredMeetings.length === 0) return null;
+    if (activeTab !== 'in_person' || !isNearestMode || filteredMeetings.length === 0) return null;
     return filteredMeetings[0];
-  }, [isNearestMode, filteredMeetings]);
+  }, [activeTab, isNearestMode, filteredMeetings]);
 
-  // Active filter items for chips
   const activeFilterItems: ActiveFilterItem[] = useMemo(() => {
     const list: ActiveFilterItem[] = [];
 
-    if (isNearestMode) {
+    if (activeTab === 'in_person' && isNearestMode) {
       list.push({
         key: 'nearest',
         label: isAr ? 'الموقع' : 'Location',
@@ -400,7 +430,7 @@ export default function MeetingsScreen() {
       });
     }
 
-    if (filters.cityId) {
+    if (activeTab === 'in_person' && filters.cityId) {
       const c = cities.find((item) => String(item.id) === String(filters.cityId));
       list.push({
         key: 'cityId',
@@ -409,7 +439,7 @@ export default function MeetingsScreen() {
       });
     }
 
-    if (filters.groupType) {
+    if (activeTab === 'in_person' && filters.groupType) {
       const labels: Record<string, string> = {
         in_person: isAr ? 'حضوري' : 'In-Person',
         online: isAr ? 'أونلاين' : 'Online',
@@ -448,7 +478,7 @@ export default function MeetingsScreen() {
     }
 
     return list;
-  }, [filters, days, cities, isAr, isNearestMode, selectedCityCenter]);
+  }, [filters, days, cities, isAr, activeTab, isNearestMode, selectedCityCenter]);
 
   const handleRemoveFilter = (key: string) => {
     if (key === 'nearest') {
@@ -491,9 +521,12 @@ export default function MeetingsScreen() {
         onToggleBookmark={toggleBookmark}
         index={index}
         distanceKm={item.distanceKm}
+        groupType={item.groupType}
+        isOnline={activeTab === 'online' || isOnlineMeeting(item)}
+        timeInfo={item.timeInfo}
       />
     ),
-    [bookmarks, toggleBookmark]
+    [bookmarks, toggleBookmark, activeTab]
   );
 
   return (
@@ -503,10 +536,169 @@ export default function MeetingsScreen() {
         subtitle={isAr ? 'مصر • NA Egypt Fellowship' : 'Egypt • NA Fellowship'}
         bottomSlot={
           <View>
+            <View
+              style={[
+                styles.tabSegmentContainer,
+                {
+                  backgroundColor: isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.15)',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.25)',
+                  flexDirection: isAr ? 'row-reverse' : 'row',
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.tabSegmentBtn,
+                  activeTab === 'in_person' && [
+                    styles.tabSegmentBtnActive,
+                    {
+                      backgroundColor: isDark ? '#38bdf8' : '#ffffff',
+                    },
+                  ],
+                  { flexDirection: isAr ? 'row-reverse' : 'row' },
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setActiveTab('in_person');
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'in_person' }}
+              >
+                <MapPin
+                  size={15}
+                  color={
+                    activeTab === 'in_person'
+                      ? isDark ? '#0f172a' : colors.primary
+                      : '#ffffff'
+                  }
+                  style={isAr ? { marginLeft: 6 } : { marginRight: 6 }}
+                />
+                <AppText
+                  variant="label"
+                  weight="800"
+                  color={
+                    activeTab === 'in_person'
+                      ? isDark ? '#0f172a' : colors.primary
+                      : '#ffffff'
+                  }
+                >
+                  {t('meetings.in_person_meetings')}
+                </AppText>
+                <View
+                  style={[
+                    styles.countPill,
+                    {
+                      backgroundColor:
+                        activeTab === 'in_person'
+                          ? isDark ? 'rgba(15, 23, 42, 0.15)' : colors.primaryLight + '35'
+                          : 'rgba(255, 255, 255, 0.2)',
+                      marginStart: isAr ? 0 : 6,
+                      marginEnd: isAr ? 6 : 0,
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    weight="800"
+                    color={
+                      activeTab === 'in_person'
+                        ? isDark ? '#0f172a' : colors.primary
+                        : '#ffffff'
+                    }
+                  >
+                    {totalInPersonCount}
+                  </AppText>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.tabSegmentBtn,
+                  activeTab === 'online' && [
+                    styles.tabSegmentBtnActive,
+                    {
+                      backgroundColor: isDark ? '#38bdf8' : '#ffffff',
+                    },
+                  ],
+                  { flexDirection: isAr ? 'row-reverse' : 'row' },
+                ]}
+                onPress={() => {
+                  haptic.selection();
+                  setActiveTab('online');
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'online' }}
+              >
+                <Video
+                  size={15}
+                  color={
+                    activeTab === 'online'
+                      ? isDark ? '#0f172a' : colors.primary
+                      : '#ffffff'
+                  }
+                  style={isAr ? { marginLeft: 6 } : { marginRight: 6 }}
+                />
+                <AppText
+                  variant="label"
+                  weight="800"
+                  color={
+                    activeTab === 'online'
+                      ? isDark ? '#0f172a' : colors.primary
+                      : '#ffffff'
+                  }
+                >
+                  {t('meetings.online_meetings')}
+                </AppText>
+                {hasLiveOnlineMeetings && (
+                  <View
+                    style={[
+                      styles.liveIndicatorDot,
+                      {
+                        backgroundColor: '#22c55e',
+                        marginStart: isAr ? 0 : 4,
+                        marginEnd: isAr ? 4 : 0,
+                      },
+                    ]}
+                  />
+                )}
+                <View
+                  style={[
+                    styles.countPill,
+                    {
+                      backgroundColor:
+                        activeTab === 'online'
+                          ? isDark ? 'rgba(15, 23, 42, 0.15)' : colors.primaryLight + '35'
+                          : 'rgba(255, 255, 255, 0.2)',
+                      marginStart: isAr ? 0 : 6,
+                      marginEnd: isAr ? 6 : 0,
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    weight="800"
+                    color={
+                      activeTab === 'online'
+                        ? isDark ? '#0f172a' : colors.primary
+                        : '#ffffff'
+                    }
+                  >
+                    {totalOnlineCount}
+                  </AppText>
+                </View>
+              </TouchableOpacity>
+            </View>
+
             <SearchBar
               query={searchQuery}
               onChangeQuery={setSearchQuery}
-              placeholder={t('meetings.search_placeholder')}
+              placeholder={
+                activeTab === 'online'
+                  ? (isAr ? 'ابحث في اجتماعات أونلاين أو الموضوع...' : 'Search online meetings or topics...')
+                  : t('meetings.search_placeholder')
+              }
               onFilterPress={() => setIsFilterVisible(true)}
               activeFilterCount={activeFilterItems.length}
               recentSearches={recentSearches}
@@ -517,70 +709,70 @@ export default function MeetingsScreen() {
               onClearRecentSearches={clearRecentSearches}
             />
 
-            {/* Quick Action Nearest Mode Bar */}
-            <View style={[styles.nearestBarRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity
-                onPress={isNearestMode ? handleDeactivateNearestMode : handleActivateNearestMode}
-                disabled={isLocating}
-                style={[
-                  styles.nearestToggleBtn,
-                  {
-                    backgroundColor: isNearestMode
-                      ? isDark
-                        ? '#0284c7'
-                        : colors.primary
-                      : isDark
-                      ? 'rgba(255, 255, 255, 0.1)'
-                      : 'rgba(255, 255, 255, 0.15)',
-                    borderColor: isNearestMode ? '#38bdf8' : 'rgba(255, 255, 255, 0.25)',
-                    flexDirection: isAr ? 'row-reverse' : 'row',
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                {isLocating ? (
-                  <ActivityIndicator size="small" color="#ffffff" style={isAr ? { marginLeft: 6 } : { marginRight: 6 }} />
-                ) : (
-                  <Navigation
-                    size={15}
-                    color="#ffffff"
-                    style={isAr ? { marginLeft: 6 } : { marginRight: 6 }}
-                  />
-                )}
-                <AppText variant="labelSmall" weight="800" color="#ffffff">
-                  {isLocating
-                    ? t('meetings.locating')
-                    : isNearestMode
-                    ? t('meetings.nearest_active')
-                    : t('meetings.nearest_to_me')}
-                </AppText>
-                {isNearestMode && (
-                  <View style={[styles.activeDot, { backgroundColor: '#34d399', marginStart: isAr ? 0 : 6, marginEnd: isAr ? 6 : 0 }]} />
-                )}
-              </TouchableOpacity>
-
-              {isNearestMode && (
+            {activeTab === 'in_person' && (
+              <View style={[styles.nearestBarRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
-                  onPress={() => setIsCityPickerVisible(true)}
+                  onPress={isNearestMode ? handleDeactivateNearestMode : handleActivateNearestMode}
+                  disabled={isLocating}
                   style={[
-                    styles.cityPickerTrigger,
+                    styles.nearestToggleBtn,
                     {
-                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.2)',
+                      backgroundColor: isNearestMode
+                        ? isDark
+                          ? '#0284c7'
+                          : colors.primary
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(255, 255, 255, 0.15)',
+                      borderColor: isNearestMode ? '#38bdf8' : 'rgba(255, 255, 255, 0.25)',
                       flexDirection: isAr ? 'row-reverse' : 'row',
                     },
                   ]}
                   activeOpacity={0.8}
                 >
-                  <MapPin size={13} color="#ffffff" style={isAr ? { marginLeft: 4 } : { marginRight: 4 }} />
-                  <AppText variant="caption" weight="700" color="#ffffff">
-                    {selectedCityCenter || (isAr ? 'تغيير المدينة' : 'Change City')}
+                  {isLocating ? (
+                    <ActivityIndicator size="small" color="#ffffff" style={isAr ? { marginLeft: 6 } : { marginRight: 6 }} />
+                  ) : (
+                    <Navigation
+                      size={15}
+                      color="#ffffff"
+                      style={isAr ? { marginLeft: 6 } : { marginRight: 6 }}
+                    />
+                  )}
+                  <AppText variant="labelSmall" weight="800" color="#ffffff">
+                    {isLocating
+                      ? t('meetings.locating')
+                      : isNearestMode
+                      ? t('meetings.nearest_active')
+                      : t('meetings.nearest_to_me')}
                   </AppText>
+                  {isNearestMode && (
+                    <View style={[styles.activeDot, { backgroundColor: '#34d399', marginStart: isAr ? 0 : 6, marginEnd: isAr ? 6 : 0 }]} />
+                  )}
                 </TouchableOpacity>
-              )}
-            </View>
 
-            {/* Scope Switcher when Nearest Mode is active */}
-            {isNearestMode && (
+                {isNearestMode && (
+                  <TouchableOpacity
+                    onPress={() => setIsCityPickerVisible(true)}
+                    style={[
+                      styles.cityPickerTrigger,
+                      {
+                        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.2)',
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <MapPin size={13} color="#ffffff" style={isAr ? { marginLeft: 4 } : { marginRight: 4 }} />
+                    <AppText variant="caption" weight="700" color="#ffffff">
+                      {selectedCityCenter || (isAr ? 'تغيير المدينة' : 'Change City')}
+                    </AppText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {activeTab === 'in_person' && isNearestMode && (
               <View style={[styles.scopeSwitcherRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
                   onPress={() => {
@@ -638,6 +830,17 @@ export default function MeetingsScreen() {
               </View>
             )}
 
+            {activeTab === 'online' && (
+              <View style={[styles.onlineNoticeBar, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                <Sparkles size={13} color={isDark ? '#38bdf8' : '#ffffff'} style={isAr ? { marginLeft: 6 } : { marginRight: 6 }} />
+                <AppText variant="caption" weight="700" color={isDark ? '#bae6fd' : '#ffffff'}>
+                  {isAr
+                    ? 'مرتبة تلقائياً: المباشر الآن أولاً 🔴 ثم الأقرب توقيتاً اليوم'
+                    : 'Sorted live now first 🔴 followed by nearest upcoming times'}
+                </AppText>
+              </View>
+            )}
+
             {activeFilterItems.length > 0 && (
               <FilterChips
                 items={activeFilterItems}
@@ -650,12 +853,14 @@ export default function MeetingsScreen() {
         }
       />
 
-      {/* Content Body */}
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
-        {/* Results Header */}
         <View style={[styles.resultsHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
           <AppText variant="label" color={isDark ? '#38bdf8' : colors.primary} weight="700">
-            {isAr
+            {activeTab === 'online'
+              ? isAr
+                ? `${filteredMeetings.length} اجتماع أونلاين متاح`
+                : `${filteredMeetings.length} online meetings available`
+              : isAr
               ? `${filteredMeetings.length} اجتماع ${isNearestMode ? 'مرتب بالأقرب' : 'متاح'}${
                   frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
                 }`
@@ -677,7 +882,6 @@ export default function MeetingsScreen() {
           )}
         </View>
 
-        {/* List / Loading / Empty State */}
         {isLoading ? (
           <View style={{ paddingTop: 8, paddingHorizontal: 16 }}>
             <MeetingCardSkeleton />
@@ -702,7 +906,7 @@ export default function MeetingsScreen() {
               />
             }
             ListHeaderComponent={
-              isNearestMode && closestMeeting ? (
+              activeTab === 'in_person' && isNearestMode && closestMeeting ? (
                 <ClosestMeetingHero meeting={closestMeeting} />
               ) : null
             }
@@ -710,9 +914,13 @@ export default function MeetingsScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon={<MapPinOff size={44} color={colors.accent} />}
-                title={t('meetings.no_results')}
+                title={activeTab === 'online' ? t('meetings.no_online_meetings') : t('meetings.no_in_person_meetings')}
                 description={
-                  isNearestMode && nearestDayScope === 'today'
+                  activeTab === 'online'
+                    ? isAr
+                      ? 'لم يتم العثور على اجتماعات أونلاين تطابق البحث أو الفلاتر المحددة.'
+                      : 'No online meetings match your search or selected filters.'
+                    : isNearestMode && nearestDayScope === 'today'
                     ? isAr
                       ? 'لا توجد اجتماعات متبقية اليوم في منطقتك. جرب التبديل إلى "جميع الأيام" لمشاهدة أقرب الاجتماعات خلال الأسبوع.'
                       : 'No more meetings remaining today near you. Try switching to "All Days" to see upcoming meetings this week.'
@@ -725,7 +933,7 @@ export default function MeetingsScreen() {
                     : 'No meetings found matching your search.'
                 }
                 primaryActionTitle={
-                  isNearestMode && nearestDayScope === 'today'
+                  activeTab === 'in_person' && isNearestMode && nearestDayScope === 'today'
                     ? isAr
                       ? 'عرض جميع الأيام'
                       : 'View All Days'
@@ -736,7 +944,7 @@ export default function MeetingsScreen() {
                     : undefined
                 }
                 onPrimaryAction={
-                  isNearestMode && nearestDayScope === 'today'
+                  activeTab === 'in_person' && isNearestMode && nearestDayScope === 'today'
                     ? () => setNearestDayScope('all')
                     : activeFilterItems.length > 0
                     ? handleClearAllFilters
@@ -750,7 +958,6 @@ export default function MeetingsScreen() {
         )}
       </View>
 
-      {/* Filter Bottom Sheet */}
       <FilterModal
         visible={isFilterVisible}
         onClose={() => setIsFilterVisible(false)}
@@ -758,6 +965,7 @@ export default function MeetingsScreen() {
         onApplyFilters={setFilters}
         cities={cities}
         days={days}
+        isOnlineTab={activeTab === 'online'}
       />
 
       {/* City Center Picker Modal (Location Fallback) */}
@@ -874,6 +1082,52 @@ export default function MeetingsScreen() {
 const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
+  },
+  tabSegmentContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    marginBottom: 10,
+    gap: 6,
+  },
+  tabSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  tabSegmentBtnActive: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  countPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  onlineNoticeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   filterChipsRow: {
     marginTop: 6,

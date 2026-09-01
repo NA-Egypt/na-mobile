@@ -53,7 +53,7 @@ export default function LoginScreen() {
 
       if (result.success && result.sanctumToken) {
         haptic.success();
-        const servantName = result.user?.name || (isAr ? 'خادم معتمد' : 'Trusted Servant');
+        const servantName = result.user?.name || (isAr ? 'خادم مؤتمن' : 'Trusted Servant');
         Alert.alert(
           isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
           isAr
