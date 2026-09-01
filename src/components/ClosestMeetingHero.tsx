@@ -47,6 +47,15 @@ export const ClosestMeetingHero: React.FC<ClosestMeetingHeroProps> = ({
 
   const handleOpenMap = () => {
     haptic.selection();
+    const queryParts = [
+      meeting.groupName,
+      meeting.address,
+      meeting.neighborhoodName,
+      meeting.cityName,
+      'Egypt',
+    ].filter(Boolean);
+    const query = encodeURIComponent(queryParts.join(', '));
+
     if (
       meeting.locationUrl &&
       (meeting.locationUrl.startsWith('http://') ||
@@ -55,17 +64,11 @@ export const ClosestMeetingHero: React.FC<ClosestMeetingHeroProps> = ({
         meeting.locationUrl.startsWith('maps:'))
     ) {
       Linking.openURL(meeting.locationUrl).catch(() => {
-        const query = encodeURIComponent(
-          `${meeting.groupName}, ${meeting.neighborhoodName}, ${meeting.cityName}, Egypt`
-        );
         Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
       });
       return;
     }
 
-    const query = encodeURIComponent(
-      `${meeting.groupName}, ${meeting.neighborhoodName}, ${meeting.cityName}, Egypt`
-    );
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
       android: `geo:0,0?q=${query}`,

@@ -506,6 +506,7 @@ export default function MeetingsScreen() {
         groupName={item.groupName}
         cityName={item.cityName}
         neighborhoodName={item.neighborhoodName}
+        address={item.address}
         dayName={item.dayName}
         dayId={item.dayId}
         startTime={item.startTime}

@@ -29,6 +29,7 @@ import {
   ExternalLink,
   KeyRound,
   Hash,
+  Building2,
 } from 'lucide-react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useAppTheme } from '../theme';
@@ -52,6 +53,7 @@ export interface MeetingCardProps {
   groupName: string;
   cityName: string;
   neighborhoodName: string;
+  address?: string;
   dayName: string;
   dayId?: string | number;
   startTime: string;
@@ -77,6 +79,7 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   groupName,
   cityName,
   neighborhoodName,
+  address,
   dayName,
   dayId,
   startTime,
@@ -131,6 +134,9 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
 
   const handleOpenMap = () => {
     haptic.selection();
+    const queryParts = [groupName, address, neighborhoodName, cityName, 'Egypt'].filter(Boolean);
+    const query = encodeURIComponent(queryParts.join(', '));
+
     if (
       locationUrl &&
       (locationUrl.startsWith('http://') ||
@@ -139,13 +145,11 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
         locationUrl.startsWith('maps:'))
     ) {
       Linking.openURL(locationUrl).catch(() => {
-        const query = encodeURIComponent(`${groupName}, ${neighborhoodName}, ${cityName}, Egypt`);
         Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
       });
       return;
     }
 
-    const query = encodeURIComponent(`${groupName}, ${neighborhoodName}, ${cityName}, Egypt`);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
       android: `geo:0,0?q=${query}`,
@@ -193,7 +197,7 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   const handleShare = async () => {
     haptic.light();
     try {
-      let locationText = `📍 ${cityName}${neighborhoodName ? ` • ${neighborhoodName}` : ''}`;
+      let locationText = `📍 ${cityName}${neighborhoodName ? ` • ${neighborhoodName}` : ''}${address ? `\n🏢 ${address}` : ''}`;
       if (isOnlineActual) {
         locationText = `💻 ${isAr ? 'اجتماع أونلاين عبر زووم' : 'Online Zoom Meeting'}${zoomDetails.joinUrl ? `\n🔗 ${zoomDetails.joinUrl}` : ''}${zoomDetails.meetingId ? `\n🆔 ID: ${zoomDetails.meetingId}` : ''}${zoomDetails.passcode ? `\n🔑 Passcode: ${zoomDetails.passcode}` : ''}`;
       }
@@ -419,6 +423,38 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
               : `${cityName}${neighborhoodName ? ` • ${neighborhoodName}` : ''}`}
           </AppText>
         </View>
+
+        {/* Physical Address Row for In-Person */}
+        {!isOnlineActual && address ? (
+          <TouchableOpacity
+            style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
+            onPress={handleOpenMap}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={isAr ? `العنوان: ${address}` : `Address: ${address}`}
+          >
+            <View
+              style={[
+                styles.iconWrapper,
+                {
+                  backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : colors.primaryLight + '25',
+                  marginEnd: isAr ? 0 : 8,
+                  marginStart: isAr ? 8 : 0,
+                },
+              ]}
+            >
+              <Building2 size={13} color={isDark ? '#38bdf8' : colors.primary} />
+            </View>
+            <AppText
+              variant="bodySmall"
+              color={isDark ? '#bae6fd' : colors.primary}
+              weight="600"
+              style={[styles.infoText, { textAlign: isAr ? 'right' : 'left' }]}
+            >
+              {address}
+            </AppText>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Time Row */}
         <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
