@@ -24,7 +24,7 @@ import {
   ShieldCheck,
 } from 'lucide-react-native';
 import { useAppTheme, useThemeStore } from '../theme';
-import { AppText, Badge } from './ui';
+import { AppText, Badge, MicrosoftLogo } from './ui';
 import { haptic } from '../utils/haptics';
 import { azureAuthService } from '../services/azureAuthService';
 import { authApi, UserProfile } from '../api/auth';
@@ -328,10 +328,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <View
                       style={[
                         styles.loginIconBg,
-                        { backgroundColor: colors.accent + '25' },
+                        { backgroundColor: '#2F2F2F' },
                       ]}
                     >
-                      <ShieldCheck size={20} color={colors.accent} />
+                      <MicrosoftLogo size={18} />
                     </View>
 
                     <View

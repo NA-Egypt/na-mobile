@@ -21,7 +21,7 @@ import {
 } from 'lucide-react-native';
 import { NALogo } from '../src/components/NALogo';
 import { useAppTheme } from '../src/theme';
-import { AppText, Badge, LanguageSwitcher } from '../src/components/ui';
+import { AppText, Badge, LanguageSwitcher, MicrosoftLogo } from '../src/components/ui';
 import { haptic } from '../src/utils/haptics';
 import { azureAuthService } from '../src/services/azureAuthService';
 
@@ -223,12 +223,7 @@ export default function LoginScreen() {
             ) : (
               <View style={styles.msButtonContent}>
                 {/* Official 4-Color Microsoft Square */}
-                <View style={styles.msLogo}>
-                  <View style={[styles.msSquare, { backgroundColor: '#F25022' }]} />
-                  <View style={[styles.msSquare, { backgroundColor: '#7FBA00' }]} />
-                  <View style={[styles.msSquare, { backgroundColor: '#00A4EF' }]} />
-                  <View style={[styles.msSquare, { backgroundColor: '#FFB900' }]} />
-                </View>
+                <MicrosoftLogo size={20} style={{ marginEnd: 10 }} />
                 <AppText variant="body" color="#ffffff" weight="700" style={styles.msButtonText}>
                   {isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'}
                 </AppText>

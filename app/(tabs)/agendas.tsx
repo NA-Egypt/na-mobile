@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,10 +10,12 @@ import {
   Platform,
   Alert,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import NetInfo from '@react-native-community/netinfo';
 import {
   Lock,
   LogOut,
@@ -30,22 +32,19 @@ import {
   Building2,
   FileArchive,
   DownloadCloud,
-  Layers,
   RefreshCw,
-  UserCheck,
-  Coins,
   HeartHandshake,
   UserPlus,
   ExternalLink,
   HelpCircle,
-  AlertCircle,
   MessageSquare,
+  WifiOff,
 } from 'lucide-react-native';
-import { authApi, UserProfile } from '../../src/api/auth';
+import { UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
+import { agendasApi } from '../../src/api/agendas';
+import { reportsApi } from '../../src/api/reports';
 import { azureAuthService } from '../../src/services/azureAuthService';
-import { database } from '../../src/database';
-import GroupModel from '../../src/database/models/Group';
 import { useAppTheme } from '../../src/theme';
 import {
   AppText,
@@ -54,6 +53,7 @@ import {
   EmptyState,
   Skeleton,
   AppHeader,
+  MicrosoftLogo,
 } from '../../src/components/ui';
 import { haptic } from '../../src/utils/haptics';
 
@@ -90,7 +90,6 @@ export default function AgendasScreen() {
   const [groupAgendas, setGroupAgendas] = useState<any[]>([]);
   const [serviceBodyAgendas, setServiceBodyAgendas] = useState<any[]>([]);
   const [committeeReports, setCommitteeReports] = useState<any[]>([]);
-  const [groupLookup, setGroupLookup] = useState<Record<string, { ar_name: string; en_name: string }>>({});
   const [tabForbidden, setTabForbidden] = useState<Record<AgendaTabType, boolean>>({
     groups: false,
     service_bodies: false,
@@ -99,25 +98,11 @@ export default function AgendasScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [isOfflineError, setIsOfflineError] = useState(false);
 
-  useEffect(() => {
-    const loadLocalGroups = async () => {
-      try {
-        const groups = await database.get<GroupModel>('groups').query().fetch();
-        const map: Record<string, { ar_name: string; en_name: string }> = {};
-        groups.forEach((g) => {
-          const item = { ar_name: g.name || '', en_name: g.name || '' };
-          if (g.remoteId) map[String(g.remoteId)] = item;
-          if (g.id) map[String(g.id)] = item;
-        });
-        setGroupLookup(map);
-      } catch (err) {
-        console.warn('Error loading local groups for agenda titles:', err);
-      }
-    };
-    loadLocalGroups();
-  }, []);
+  // Selected item modal & live detail fetching
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const fetchAllData = async (currentUser?: UserProfile | null) => {
     const activeUser = currentUser !== undefined ? currentUser : user;
@@ -127,10 +112,28 @@ export default function AgendasScreen() {
       setCommitteeReports([]);
       setIsLoading(false);
       setIsRefreshing(false);
+      setIsOfflineError(false);
       return;
     }
 
+    // Check live internet connectivity
+    try {
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        setIsOfflineError(true);
+        setGroupAgendas([]);
+        setServiceBodyAgendas([]);
+        setCommitteeReports([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+    } catch {
+      // Continue if NetInfo check has issues
+    }
+
     setIsLoading(true);
+    setIsOfflineError(false);
     setTabForbidden({ groups: false, service_bodies: false, committees_archive: false });
 
     try {
@@ -140,6 +143,8 @@ export default function AgendasScreen() {
         apiClient.get('/committee-reports', { params: { per_page: 100 } }),
       ]);
 
+      let hasNetworkFailure = false;
+
       if (agendasRes.status === 'fulfilled') {
         const data = agendasRes.value.data?.data || agendasRes.value.data || [];
         setGroupAgendas(Array.isArray(data) ? data : []);
@@ -147,6 +152,8 @@ export default function AgendasScreen() {
         const status = (agendasRes.reason as any)?.response?.status;
         if (status === 403) {
           setTabForbidden((prev) => ({ ...prev, groups: true }));
+        } else if (!status) {
+          hasNetworkFailure = true;
         }
         setGroupAgendas([]);
       }
@@ -158,6 +165,8 @@ export default function AgendasScreen() {
         const status = (sbRes.reason as any)?.response?.status;
         if (status === 403) {
           setTabForbidden((prev) => ({ ...prev, service_bodies: true }));
+        } else if (!status) {
+          hasNetworkFailure = true;
         }
         setServiceBodyAgendas([]);
       }
@@ -169,11 +178,18 @@ export default function AgendasScreen() {
         const status = (reportsRes.reason as any)?.response?.status;
         if (status === 403) {
           setTabForbidden((prev) => ({ ...prev, committees_archive: true }));
+        } else if (!status) {
+          hasNetworkFailure = true;
         }
         setCommitteeReports([]);
       }
+
+      if (hasNetworkFailure && agendasRes.status === 'rejected' && sbRes.status === 'rejected' && reportsRes.status === 'rejected') {
+        setIsOfflineError(true);
+      }
     } catch (e) {
-      console.warn('Error loading agendas/reports with auth:', e);
+      console.warn('Error loading agendas/reports live:', e);
+      setIsOfflineError(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -190,6 +206,7 @@ export default function AgendasScreen() {
           setGroupAgendas([]);
           setServiceBodyAgendas([]);
           setCommitteeReports([]);
+          setIsOfflineError(false);
         }
       });
     }, [])
@@ -241,6 +258,54 @@ export default function AgendasScreen() {
     await fetchAllData();
   };
 
+  // Open item and fetch complete live API details
+  const handleOpenItem = async (item: any, modalType: 'group' | 'service_body' | 'committee', defaultTitle: string) => {
+    haptic.selection();
+    setSelectedItem({ ...item, resolvedTitle: defaultTitle, modalType, loadedFromApi: false });
+    setIsLoadingDetails(true);
+
+    try {
+      if (modalType === 'group' && item.id) {
+        const full = await agendasApi.getGroupAgenda(item.id);
+        if (full) {
+          setSelectedItem((prev: any) => ({
+            ...prev,
+            ...full,
+            resolvedTitle: defaultTitle,
+            modalType,
+            loadedFromApi: true,
+          }));
+        }
+      } else if (modalType === 'service_body' && item.id) {
+        const full = await agendasApi.getServiceBodyAgenda(item.id);
+        if (full) {
+          setSelectedItem((prev: any) => ({
+            ...prev,
+            ...full,
+            resolvedTitle: defaultTitle,
+            modalType,
+            loadedFromApi: true,
+          }));
+        }
+      } else if (modalType === 'committee' && item.id) {
+        const full = await reportsApi.getCommitteeReport(item.id);
+        if (full) {
+          setSelectedItem((prev: any) => ({
+            ...prev,
+            ...full,
+            resolvedTitle: defaultTitle,
+            modalType,
+            loadedFromApi: true,
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load extra item details live:', e);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
   const currentList = (
     activeTab === 'groups'
       ? groupAgendas
@@ -253,7 +318,7 @@ export default function AgendasScreen() {
     <View style={[styles.screenWrapper, { backgroundColor: isDark ? colors.bgDark : colors.primaryDark }]}>
       <AppHeader
         title={isAr ? 'جداول الأعمال والأرشيف' : 'Agendas & Reports'}
-        subtitle={isAr ? 'مصر • أرشيف الخدمة' : 'Egypt • Service Archive'}
+        subtitle={isAr ? 'مصر • أرشيف الخدمة المباشر' : 'Egypt • Live Service Archive'}
         bottomSlot={
           <View style={styles.tabSelectorWrapper}>
             <ScrollView
@@ -403,19 +468,28 @@ export default function AgendasScreen() {
                 </AppText>
                 <AppText variant="caption" color={colors.textSecondary} style={{ marginTop: 2 }}>
                   {isAr
-                    ? 'سجل دخولك بحساب الخدمة للاطلاع على أرشيف اللجان وجداول الأعمال'
-                    : 'Sign in with your NA account to access committee archives'}
+                    ? 'سجل دخولك بحساب مايكروسوفت للاطلاع على أرشيف الخدمة المباشر'
+                    : 'Sign in with Microsoft to access live service archives'}
                 </AppText>
               </View>
-              <AppButton
-                title={t('agendas.login_prompt')}
+              <TouchableOpacity
+                style={[
+                  styles.msSmallLoginBtn,
+                  { backgroundColor: '#2F2F2F', borderRadius: borderRadius.sm },
+                ]}
                 onPress={() => {
                   haptic.selection();
                   router.push('/login');
                 }}
-                variant="primary"
-                size="sm"
-              />
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('agendas.login_prompt')}
+              >
+                <MicrosoftLogo size={14} style={{ marginEnd: 6 }} />
+                <AppText variant="caption" color="#ffffff" weight="700">
+                  {t('agendas.login_prompt')}
+                </AppText>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -452,18 +526,59 @@ export default function AgendasScreen() {
               </AppText>
               <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
                 {isAr
-                  ? 'هذا القسم مخصص للخدم المؤتمن في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ naegypt.org. للاطلاع على البيانات والتقارير المتاحة لخدمتك.'
-                  : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official naegypt.org Microsoft account to access reports and agendas permitted for your role.'}
+                  ? 'هذا القسم مخصص للخدم المؤتمن في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ naegypt.org. للاطلاع على البيانات والتقارير المتاحة لخدمتك مباشرة عبر الإنترنت.'
+                  : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official naegypt.org Microsoft account to access live reports and agendas permitted for your role.'}
               </AppText>
-              <AppButton
-                title={t('agendas.login_prompt')}
+              <TouchableOpacity
+                style={[
+                  styles.msPrimaryLoginBtn,
+                  { backgroundColor: '#2F2F2F', borderRadius: borderRadius.md },
+                ]}
                 onPress={() => {
                   haptic.selection();
                   router.push('/login');
                 }}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel={t('agendas.login_prompt')}
+              >
+                <MicrosoftLogo size={18} style={{ marginEnd: 10 }} />
+                <AppText variant="body" color="#ffffff" weight="700">
+                  {isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'}
+                </AppText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : isOfflineError ? (
+          /* Offline / Active Internet Required Banner */
+          <ScrollView contentContainerStyle={styles.loggedOutScrollContent}>
+            <View
+              style={[
+                styles.loggedOutCard,
+                shadows.card,
+                {
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.cardBorder,
+                  borderRadius: borderRadius.card,
+                },
+              ]}
+            >
+              <View style={[styles.lockLargeIcon, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <WifiOff size={30} color={colors.danger} />
+              </View>
+              <AppText variant="h3" color={colors.textPrimary} weight="800" style={{ textAlign: 'center', marginBottom: 6 }}>
+                {t('agendas.online_only_title')}
+              </AppText>
+              <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
+                {t('agendas.network_required')}
+              </AppText>
+              <AppButton
+                title={t('agendas.retry')}
+                onPress={handleRefresh}
                 variant="primary"
                 size="md"
-                style={{ width: '100%' }}
+                icon={<RefreshCw size={16} color="#ffffff" />}
+                style={{ minWidth: 180 }}
               />
             </View>
           </ScrollView>
@@ -559,14 +674,10 @@ export default function AgendasScreen() {
                 const dateStr = item.agenda_date || item.created_at || '';
                 const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
                 const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
-                const groupId = item.group_id || item.groupId || item.group?.id;
-                const localGroup = groupId ? groupLookup[String(groupId)] : null;
                 const groupTitle =
-                  (isAr ? item.group?.ar_name || localGroup?.ar_name : item.group?.en_name || localGroup?.en_name) ||
+                  (isAr ? item.group?.ar_name : item.group?.en_name) ||
                   item.group?.ar_name ||
                   item.group?.en_name ||
-                  localGroup?.ar_name ||
-                  localGroup?.en_name ||
                   item.group_name ||
                   item.title ||
                   (isAr ? 'جدول أعمال مجموعة' : 'Group Business Agenda');
@@ -635,10 +746,7 @@ export default function AgendasScreen() {
 
                     <AppButton
                       title={isAr ? 'عرض جدول الأعمال كاملاً' : 'View Full Agenda'}
-                      onPress={() => {
-                        haptic.selection();
-                        setSelectedItem({ ...item, resolvedTitle: groupTitle, modalType: 'group' });
-                      }}
+                      onPress={() => handleOpenItem(item, 'group', groupTitle)}
                       variant="primary"
                       size="sm"
                       icon={<Eye size={15} color="#ffffff" />}
@@ -648,7 +756,7 @@ export default function AgendasScreen() {
                 );
               } else if (activeTab === 'service_bodies') {
                 const title = item.title || item.name || (isAr ? 'جدول أعمال منطقة أو منتدى' : 'Service Body Agenda');
-                const sbName = item.service_body_name || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee');
+                const sbName = item.service_body_name || (isAr ? item.service_body?.ar_name : item.service_body?.en_name) || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee');
                 const isApproved = item.status === 'approved';
                 const dateStr = item.meeting_date || item.agenda_date || item.created_at || '';
 
@@ -699,10 +807,7 @@ export default function AgendasScreen() {
 
                     <AppButton
                       title={isAr ? 'عرض جدول الأعمال ومحضر الاجتماع' : 'View Agenda & Minutes'}
-                      onPress={() => {
-                        haptic.selection();
-                        setSelectedItem({ ...item, resolvedTitle: title, modalType: 'service_body' });
-                      }}
+                      onPress={() => handleOpenItem(item, 'service_body', title)}
                       variant="primary"
                       size="sm"
                       icon={<Eye size={15} color="#ffffff" />}
@@ -711,7 +816,7 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else {
-                const committeeName = item?.committee_name || item?.committee?.name || (isAr ? 'لجنة خدمية' : 'Service Committee');
+                const committeeName = item?.committee_name || (isAr ? item?.committee?.ar_name || item?.service_committee?.ar_name : item?.committee?.en_name || item?.service_committee?.en_name) || item?.committee?.name || (isAr ? 'لجنة خدمية' : 'Service Committee');
                 const period = item?.period || item?.report_date || (item?.created_at ? String(item.created_at).slice(0, 10) : '');
                 const title = item?.title || item?.name || `${committeeName}${period ? ` - ${period}` : ''}`;
                 const isApproved = item?.status === 'approved';
@@ -759,10 +864,7 @@ export default function AgendasScreen() {
 
                     <AppButton
                       title={isAr ? 'قراءة وتحميل الوثيقة' : 'View & Download Document'}
-                      onPress={() => {
-                        haptic.selection();
-                        setSelectedItem({ ...item, resolvedTitle: title, modalType: 'committee' });
-                      }}
+                      onPress={() => handleOpenItem(item, 'committee', title)}
                       variant="primary"
                       size="sm"
                       icon={<DownloadCloud size={15} color="#ffffff" />}
@@ -778,8 +880,8 @@ export default function AgendasScreen() {
                 title={isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section'}
                 description={
                   isAr
-                    ? 'يتم مزامنة تقارير وأرشيف اللجان وجداول الأعمال مباشرة من قاعدة بيانات egyptna.org وفقاً لصلاحيات حسابك.'
-                    : 'Agendas and Committee records synchronize directly from egyptna.org according to your role permissions.'
+                    ? 'يتم عرض تقارير وأرشيف اللجان وجداول الأعمال مباشرة من الخادم وفقاً لصلاحيات حسابك المعتمد.'
+                    : 'Agendas and Committee records load directly from the server according to your verified account permissions.'
                 }
               />
             }
@@ -810,6 +912,15 @@ export default function AgendasScreen() {
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {isLoadingDetails ? (
+              <View style={styles.modalLoadingBanner}>
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginEnd: 8 }} />
+                <AppText variant="caption" color={colors.textSecondary} weight="600">
+                  {isAr ? 'جاري استرداد البيانات الحية الكاملة من الخادم...' : 'Fetching complete live details from server...'}
+                </AppText>
+              </View>
+            ) : null}
+
             {selectedItem?.modalType === 'group' ? (
               /* GROUP AGENDA FULL DETAILS */
               <View style={[styles.modalCard, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, borderRadius: borderRadius.card }]}>
@@ -846,6 +957,19 @@ export default function AgendasScreen() {
                     <Badge label={selectedItem.service_position || (isAr ? 'خادم موثوق' : 'Servant')} variant="accent" size="sm" />
                   </View>
 
+                  {/* Alternate GSR Position & Name */}
+                  {selectedItem.alt_gsr_name || selectedItem.alt_gsr_position ? (
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {isAr ? 'خادم المجموعة المناوب:' : 'Alt. GSR Servant:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {selectedItem.alt_gsr_name || (isAr ? 'خادم مناوب' : 'Alt GSR')}
+                        {selectedItem.alt_gsr_position ? ` (${selectedItem.alt_gsr_position})` : ''}
+                      </AppText>
+                    </View>
+                  ) : null}
+
                   {selectedItem.agenda_date ? (
                     <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                       <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
@@ -881,7 +1005,7 @@ export default function AgendasScreen() {
                       {isAr ? 'متوسط الأعضاء الجدد:' : 'Newcomers Average:'}
                     </AppText>
                     <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {selectedItem.new_comers !== undefined ? `${selectedItem.new_comers} ${isAr ? 'أعضاء' : 'members'}` : (isAr ? 'غير مسجل' : 'N/A')}
+                      {selectedItem.new_comers !== undefined && selectedItem.new_comers !== null ? `${selectedItem.new_comers} ${isAr ? 'أعضاء' : 'members'}` : (isAr ? 'غير مسجل' : 'N/A')}
                     </AppText>
                   </View>
 
@@ -895,6 +1019,20 @@ export default function AgendasScreen() {
                       </AppText>
                     </View>
                   ) : null}
+
+                  {selectedItem.recovery_meetings_changes !== undefined && (
+                    <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {isAr ? 'تغييرات في مواعيد أو أماكن الاجتماعات:' : 'Meeting Schedule/Location Changes:'}
+                      </AppText>
+                      <Badge
+                        label={selectedItem.recovery_meetings_changes ? (isAr ? 'يوجد تغييرات' : 'Has Changes') : (isAr ? 'لا توجد تغييرات' : 'No Changes')}
+                        variant={selectedItem.recovery_meetings_changes ? 'warning' : 'neutral'}
+                        size="sm"
+                        style={{ marginTop: 4 }}
+                      />
+                    </View>
+                  )}
 
                   {selectedItem.open_positions ? (
                     <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
@@ -989,7 +1127,7 @@ export default function AgendasScreen() {
                       {isAr ? 'المنتديات أو المناطق:' : 'Service Body:'}
                     </AppText>
                     <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {selectedItem.service_body_name || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee')}
+                      {selectedItem.service_body_name || (isAr ? selectedItem.service_body?.ar_name : selectedItem.service_body?.en_name) || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee')}
                     </AppText>
                   </View>
 
@@ -1004,13 +1142,24 @@ export default function AgendasScreen() {
                     />
                   </View>
 
-                  {selectedItem.meeting_date || selectedItem.created_at ? (
-                    <View style={[styles.detailGridItemFull, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                  {selectedItem.month || selectedItem.year ? (
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {isAr ? 'الفترة:' : 'Period:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {`${selectedItem.month || ''} ${selectedItem.year || ''}`.trim()}
+                      </AppText>
+                    </View>
+                  ) : null}
+
+                  {selectedItem.meeting_date || selectedItem.agenda_date || selectedItem.created_at ? (
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
                       <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
                         {isAr ? 'تاريخ الاجتماع / التوثيق:' : 'Meeting Date:'}
                       </AppText>
                       <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
-                        {String(selectedItem.meeting_date || selectedItem.created_at).slice(0, 10)}
+                        {String(selectedItem.meeting_date || selectedItem.agenda_date || selectedItem.created_at).slice(0, 10)}
                       </AppText>
                     </View>
                   ) : null}
@@ -1072,7 +1221,7 @@ export default function AgendasScreen() {
                       {isAr ? 'اللجنة الخدمية:' : 'Service Committee:'}
                     </AppText>
                     <AppText variant="body" color={colors.textPrimary} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {selectedItem?.committee_name || selectedItem?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee')}
+                      {selectedItem?.committee_name || (isAr ? selectedItem?.committee?.ar_name || selectedItem?.service_committee?.ar_name : selectedItem?.committee?.en_name || selectedItem?.service_committee?.en_name) || selectedItem?.committee?.name || (isAr ? 'لجنة العلاقات العامة والخدمة' : 'Service Committee')}
                     </AppText>
                   </View>
 
@@ -1081,9 +1230,33 @@ export default function AgendasScreen() {
                       {isAr ? 'فترة التقرير:' : 'Reporting Period:'}
                     </AppText>
                     <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
-                      {selectedItem?.period || (selectedItem?.created_at ? String(selectedItem.created_at).slice(0, 10) : (isAr ? 'الفترة الحالية' : 'Current'))}
+                      {selectedItem?.period || selectedItem?.report_date || (selectedItem?.created_at ? String(selectedItem.created_at).slice(0, 10) : (isAr ? 'الفترة الحالية' : 'Current'))}
                     </AppText>
                   </View>
+
+                  {selectedItem?.author_name ? (
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {isAr ? 'معد التقرير:' : 'Author / Submitter:'}
+                      </AppText>
+                      <AppText variant="body" color={colors.textPrimary} style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {selectedItem.author_name}
+                      </AppText>
+                    </View>
+                  ) : null}
+
+                  {selectedItem?.status ? (
+                    <View style={[styles.detailGridItem, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="caption" color={colors.textMuted} weight="700" style={{ textAlign: isAr ? 'right' : 'left' }}>
+                        {isAr ? 'حالة الاعتماد:' : 'Approval Status:'}
+                      </AppText>
+                      <Badge
+                        label={selectedItem.status === 'approved' ? (isAr ? 'معتمد' : 'Approved') : (isAr ? 'مقدم' : 'Submitted')}
+                        variant={selectedItem.status === 'approved' ? 'success' : 'neutral'}
+                        size="sm"
+                      />
+                    </View>
+                  ) : null}
                 </View>
 
                 {selectedItem?.description || selectedItem?.body || selectedItem?.content ? (
@@ -1122,7 +1295,7 @@ export default function AgendasScreen() {
             <View style={[styles.officialBadge, { backgroundColor: colors.accentLight }]}>
               <ShieldCheck size={16} color={colors.accentDark} style={{ marginEnd: 6 }} />
               <AppText variant="caption" color={colors.accentDark} weight="700">
-                {isAr ? 'وثيقة من زمالة المدمنين المجهولين' : 'Official Verified Document - NA Egypt'}
+                {isAr ? 'وثيقة مباشرة من خادم زمالة المدمنين المجهولين' : 'Live Verified Document - NA Egypt'}
               </AppText>
             </View>
           </ScrollView>
@@ -1134,27 +1307,6 @@ export default function AgendasScreen() {
 
 const styles = StyleSheet.create({
   screenWrapper: {
-    flex: 1,
-  },
-  safeHeader: {
-    paddingBottom: 4,
-  },
-  headerBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginEnd: 10,
-  },
-  headerTextCol: {
     flex: 1,
   },
   tabSelectorWrapper: {
@@ -1231,6 +1383,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingEnd: 8,
   },
+  msSmallLoginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  msPrimaryLoginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    width: '100%',
+  },
   loadingContainer: {
     padding: 16,
   },
@@ -1278,6 +1445,13 @@ const styles = StyleSheet.create({
   modalContent: {
     padding: 16,
     paddingBottom: 36,
+  },
+  modalLoadingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    marginBottom: 12,
   },
   modalCard: {
     padding: 18,

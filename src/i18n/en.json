@@ -85,7 +85,10 @@
     "view_pdf": "View PDF Report",
     "close_pdf": "Close Report",
     "login_required": "Please sign in to view service committee reports and agendas",
-    "login_prompt": "Sign In"
+    "login_prompt": "Sign In",
+    "online_only_title": "Active Internet Required",
+    "network_required": "Agendas and reports require an active internet connection to load live data directly from the server. No data is stored offline.",
+    "retry": "Retry Connection"
   },
   "contact": {
     "title": "Contact Us",
