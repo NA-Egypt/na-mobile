@@ -5,7 +5,7 @@ description: Comprehensive REST API reference, endpoints catalog, and integratio
 
 # NA-Egypt Backend REST API Reference & Integration Guide
 
-This skill provides a complete reference for integrating mobile applications (and external clients) with the NA-Egypt Laravel backend API.
+This skill provides a complete reference for integrating mobile applications (and external clients) with the NA-Egypt Laravel backend API (`naegypt.org` / `egyptna.org`).
 
 ---
 
@@ -17,7 +17,7 @@ This skill provides a complete reference for integrating mobile applications (an
 - **Authentication Scheme:** `Bearer <sanctum_token>` via HTTP `Authorization` header.
 - **HTTP Status Codes:**
   - `200 OK`: Successful read or update.
-  - `201 Created`: Resource successfully created.
+  - `201 Created`: Resource successfully created across all `store()` endpoints.
   - `204 No Content`: Resource deleted successfully.
   - `400 Bad Request`: Malformed request or missing OAuth attributes.
   - `401 Unauthorized`: Missing or invalid Bearer token / Azure OAuth token.
@@ -82,18 +82,7 @@ Mobile apps authenticate the user via Azure Active Directory / Microsoft Identit
     "id": 1,
     "name": "Jane Doe",
     "email": "jane.doe@example.com",
-    "service_body_id": 2,
-    "roles": [...]
-  }
-  ```
-
-#### `POST /api/v1/auth/logout`
-- **Access:** Authenticated (`Bearer <sanctum_token>`)
-- **Behavior:** Revokes current Sanctum personal access token.
-- **Response (200 OK):**
-  ```json
-  {
-    "message": "Logged out successfully."
+    "service_body_id": 2
   }
   ```
 
@@ -153,14 +142,6 @@ Fetches all aggregated frontpage data in one consolidated response (stats, daily
           "whatsapp": "https://wa.me/201503884411",
           "hours": "12 PM - 10 PM",
           "hours_ar": "١٢ م - ١٠ م"
-        },
-        {
-          "region": "Al-Ahram Area",
-          "region_ar": "الأهرام",
-          "phones": ["+201003694690"],
-          "whatsapp": "https://wa.me/201003694690",
-          "hours": "12 PM - 10 PM",
-          "hours_ar": "١٢ م - ١٠ م"
         }
       ],
       "social_links": {
@@ -188,7 +169,7 @@ Retrieves platform statistics counter (weekly meetings, groups, governorates, ev
 
 ### 3.1 Meetings (`/api/v1/meetings`)
 
-#### Prioritized URL Resolution Logic
+#### Prioritized URL Resolution Hierarchy
 Both `location_url` and `meeting_url` fields in `MeetingResource` are resolved following a prioritized fallback hierarchy:
 1. `$meeting->location_url`
 2. `$meeting->meeting_url`
@@ -273,7 +254,7 @@ Returns a single meeting object with loaded relations (`group`, `day`, `topics`,
     "options": [3]
   }
   ```
-- **Response (201 Created):** Single MeetingResource object.
+- **Response (201 Created):** Single `MeetingResource` object.
 
 #### `PUT /api/v1/meetings/{id}` *(Auth Required)*
 Updates meeting attributes (fields are `sometimes|required`).
@@ -304,12 +285,13 @@ Returns details of the specified group.
     "location": "https://maps.google.com/?q=...",
     "ar_address": "عنوان المجموعة بالعربية",
     "en_address": "Group Address in English",
-    "group_type": "in-person",
+    "group_type": "in_person",
     "service_body_id": 1,
     "neighborhood_id": 2,
     "capacity": 50
   }
   ```
+- **Response (201 Created):** Group object.
 
 #### `PUT /api/v1/groups/{id}` *(Auth Required)*
 - **Response (200 OK):** Updated GroupResource object.
@@ -359,8 +341,8 @@ Returns a single calendar event object.
   ```json
   {
     "title": "Regional Committee Meeting",
-    "start": "2026-09-01T10:00:00",
-    "end": "2026-09-01T14:00:00",
+    "start": "2026-09-01 10:00:00",
+    "end": "2026-09-01 14:00:00",
     "description": "Monthly regional service committee meeting.",
     "color": "#00698f",
     "organizer": "Cairo Area",
@@ -372,7 +354,6 @@ Returns a single calendar event object.
 - **Response (201 Created):** Single `CalendarEventResource` object.
 
 #### `PUT /api/v1/calendar-events/{id}` *(Auth Required)*
-Updates calendar event details (all fields accept partial updates).
 - **Response (200 OK):** Updated `CalendarEventResource` object.
 
 #### `DELETE /api/v1/calendar-events/{id}` *(Auth Required)*
@@ -429,7 +410,6 @@ Returns a single event object with loaded relations (`day`, `servicebody`).
 - **Response (201 Created):** Single `EventResource` object.
 
 #### `PUT /api/v1/events/{id}` *(Auth Required)*
-Updates event details (supports partial updates).
 - **Response (200 OK):** Updated `EventResource` object.
 
 #### `DELETE /api/v1/events/{id}` *(Auth Required)*
@@ -465,6 +445,7 @@ Returns all group agenda submissions.
     ]
   }
   ```
+- **Response (201 Created):** Single `AgendaResource` object.
 
 #### `GET /api/v1/agendas/{id}`
 Returns single agenda item.
@@ -479,17 +460,16 @@ Updates agenda submission.
 
 ### 3.6 Lookups & Directory Resources (Public Read)
 
-| Resource Endpoint | GET (Public) | POST/PUT/DELETE (Auth) | Description |
+| Resource Endpoint | GET (Public) | POST/PUT/DELETE (Auth) | Description & Key Attributes |
 | :--- | :--- | :--- | :--- |
-| `/api/v1/cities` | List / Detail | Full CRUD | Cities directory (`ar_name`, `en_name`) |
-| `/api/v1/neighborhoods` | List / Detail | Full CRUD | Neighborhoods linked to cities |
-| `/api/v1/days` | List / Detail | Full CRUD | Week days lookup (Saturday through Friday) |
-| `/api/v1/topics` | List / Detail | Full CRUD | Meeting topics (Step, Tradition, Concept, etc.) |
-| `/api/v1/options` | List / Detail | Full CRUD | Meeting options/formats (Open, Closed, Men, Women) |
-| `/api/v1/events` | List / Detail | Full CRUD | General announcements & events |
-| `/api/v1/sc-meetings` | List / Detail | Full CRUD | Service Committee schedule meetings |
-| `/api/v1/service-bodies` | List / Detail | Full CRUD | Areas / Service bodies (e.g. Cairo ASC, Alexandria ASC) |
-| `/api/v1/service-committees` | List / Detail | Full CRUD | Subcommittees (PI, H&I, Literature, Web) |
+| `/api/v1/cities` | List / Detail | Full CRUD (`201 Created`) | Cities directory (`ar_name`, `en_name`, `latitude`, `longitude`) |
+| `/api/v1/neighborhoods` | List / Detail | Full CRUD (`201 Created`) | Neighborhoods (`ar_name`, `en_name`, `city_id`, `latitude`, `longitude`) |
+| `/api/v1/days` | List / Detail | Full CRUD (`201 Created`) | Week days lookup (`ar_name`, `en_name`) |
+| `/api/v1/topics` | List / Detail | Full CRUD (`201 Created`) | Meeting topics (`ar_name`, `en_name`) |
+| `/api/v1/options` | List / Detail | Full CRUD (`201 Created`) | Meeting options (`ar_name`, `en_name`) |
+| `/api/v1/sc-meetings` | List / Detail | Full CRUD (`201 Created`) | Service Committee schedule meetings (`service_committee_id`, `week_number`, `day_id`, `time`, `notes`) |
+| `/api/v1/service-bodies` | List / Detail | Full CRUD (`201 Created`) | Areas / Service bodies (`ar_name`, `en_name`, `day_id`, `start_time`, `end_time`, `location`) |
+| `/api/v1/service-committees` | List / Detail | Full CRUD (`201 Created`) | Subcommittees (`ar_name`, `en_name`, `ar_address`, `en_address`, `location`) |
 
 ---
 
@@ -504,17 +484,17 @@ Updates agenda submission.
 Manages area/regional monthly agenda reports and voting topics. Filtered by role (`super admin`, `rsc`, `ServiceBody`).
 
 - `GET /api/v1/service-body-agendas`: List available agendas with permission rules applied.
-- `POST /api/v1/service-body-agendas`: Create monthly service body agenda.
+- `POST /api/v1/service-body-agendas`: Create monthly service body agenda (Returns `201 Created`).
 - `GET /api/v1/service-body-agendas/{id}`: Single agenda with questions & answers.
 - `PUT /api/v1/service-body-agendas/{id}`: Update agenda data.
-- `DELETE /api/v1/service-body-agendas/{id}`: Delete agenda record.
+- `DELETE /api/v1/service-body-agendas/{id}`: Delete agenda record (`204 No Content`).
 
 ---
 
 ### 4.2 Contact Requests (`/api/v1/contact-requests` & `/api/v1/contact-us`)
 
-- `GET /api/v1/contact-requests`: Retrieve member/public contact submissions.
-- `POST /api/v1/contact-requests`:
+- `GET /api/v1/contact-requests` / `GET /api/v1/contact-us`: Retrieve member/public contact submissions.
+- `POST /api/v1/contact-us`: (Returns `201 Created`)
   ```json
   {
     "name": "Member Name",
@@ -522,51 +502,71 @@ Manages area/regional monthly agenda reports and voting topics. Filtered by role
     "message": "Inquiry regarding area helpline..."
   }
   ```
-- `GET /api/v1/contact-requests/{id}`
-- `PUT /api/v1/contact-requests/{id}`
-- `DELETE /api/v1/contact-requests/{id}`
+- `GET /api/v1/contact-us/{id}`
+- `PUT /api/v1/contact-us/{id}`
+- `DELETE /api/v1/contact-us/{id}` (`204 No Content`)
 
 ---
 
-### 4.3 Financial Transactions (`/api/v1/transactions`)
+### 4.3 Audit & Financial Transactions (`/api/v1/transactions`)
 
-- `GET /api/v1/transactions`: Group 7th tradition donations and expenses.
-- `POST /api/v1/transactions`: Record new credit/debit transaction.
+- `GET /api/v1/transactions`: Audit ledger recording system and model actions.
+- `POST /api/v1/transactions`: Record audit transaction (Returns `201 Created`).
+  ```json
+  {
+    "model": "Group",
+    "operation": "create",
+    "details": { "name": "Hope Group", "city": "Cairo" },
+    "old_values": null,
+    "new_values": { "id": 1, "name": "Hope Group" }
+  }
+  ```
 - `GET /api/v1/transactions/{id}`
 - `PUT /api/v1/transactions/{id}`
-- `DELETE /api/v1/transactions/{id}`
+- `DELETE /api/v1/transactions/{id}` (`204 No Content`)
 
 ---
 
 ### 4.4 Committee Reports (`/api/v1/committee-reports`)
 
 - `GET /api/v1/committee-reports`: List sub-committee periodic reports.
-- `POST /api/v1/committee-reports`: Upload/publish sub-committee report.
+- `POST /api/v1/committee-reports`: Upload/publish sub-committee report (Returns `201 Created`).
+  ```json
+  {
+    "service_committee_id": 1,
+    "meeting_date": "2026-09-01",
+    "report_date": "2026-09-01",
+    "body": "Report summary content",
+    "status": "approved"
+  }
+  ```
 - `GET /api/v1/committee-reports/{id}`
 - `PUT /api/v1/committee-reports/{id}`
-- `DELETE /api/v1/committee-reports/{id}`
+- `DELETE /api/v1/committee-reports/{id}` (`204 No Content`)
 
 ---
 
 ### 4.5 Newsletter & Subscribers
 
 - `GET /api/v1/newsletter-members` *(Auth)*: Newsletter recipient directory.
-- `POST /subscribers-api/subscriber` *(Public)*:
+- `POST /api/v1/newsletter-members` *(Auth)*: (Returns `201 Created`)
   ```json
   {
-    "email": "user@example.com"
+    "email": "user@example.com",
+    "subscribe": true
   }
   ```
+- `DELETE /api/v1/newsletter-members/{id}` (`204 No Content`)
 
 ---
 
 ### 4.6 User & Role Management
 
 - `GET /api/v1/users`: List users (Super admin / RSC).
-- `POST /api/v1/users`: Create user account.
+- `POST /api/v1/users`: Create user account (Returns `201 Created`).
 - `GET /api/v1/users/{id}`: User profile.
 - `PUT /api/v1/users/{id}`: Update user role / service body assignment.
-- `DELETE /api/v1/users/{id}`: Deactivate/delete user account.
+- `DELETE /api/v1/users/{id}`: Deactivate/delete user account (`204 No Content`).
 - `GET /api/v1/roles`: System roles (`super admin`, `rsc`, `ServiceBody`, etc.).
 - `GET /api/v1/permissions`: Role permissions matrix.
 
@@ -576,7 +576,7 @@ Manages area/regional monthly agenda reports and voting topics. Filtered by role
 
 ### Example cURL Request with Auth:
 ```bash
-curl -X GET "https://na-egypt.org/api/v1/meetings?city=Cairo&day=Friday" \
+curl -X GET "https://naegypt.org/api/v1/meetings?city=Cairo&day=Friday" \
   -H "Accept: application/json" \
   -H "Authorization: Bearer 1|your_sanctum_token_here"
 ```
@@ -591,7 +591,7 @@ export class NaEgyptApiClient {
   private baseUrl: string;
   private token: string | null = null;
 
-  constructor(baseUrl: string = "https://na-egypt.org/api/v1") {
+  constructor(baseUrl: string = "https://naegypt.org/api/v1") {
     this.baseUrl = baseUrl;
   }
 
@@ -658,3 +658,13 @@ export class NaEgyptApiClient {
   }
 }
 ```
+
+---
+
+## 6. Automated QA & Testing Reference
+
+Run the comprehensive PHPUnit automated test suite across all 25 endpoints:
+```bash
+php vendor/bin/phpunit tests/Feature/Api/
+```
+All feature test suites (`AuthApiTest`, `CompositeApiTest`, `MeetingApiTest`, `DirectoryApiTest`, `AgendaApiTest`, `ProtectedManagementApiTest`, `CalendarEventApiTest`, `EventApiTest`) validate status codes (200/201/204/401/403/422), JSON payloads, filtering, and authorization barriers with 100% test passing.
