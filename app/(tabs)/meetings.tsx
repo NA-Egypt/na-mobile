@@ -6,14 +6,30 @@ import {
   RefreshControl,
   Platform,
   TouchableOpacity,
+  Modal,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { MapPinOff } from 'lucide-react-native';
+import {
+  MapPinOff,
+  Navigation,
+  Sparkles,
+  MapPin,
+  Check,
+  X,
+  RotateCcw,
+  Compass,
+  SlidersHorizontal,
+} from 'lucide-react-native';
 import { database } from '../../src/database';
 import Meeting from '../../src/database/models/Meeting';
 import City from '../../src/database/models/City';
 import Day from '../../src/database/models/Day';
 import { MeetingCard } from '../../src/components/MeetingCard';
+import { ClosestMeetingHero } from '../../src/components/ClosestMeetingHero';
 import { FilterModal, FilterOptions } from '../../src/components/FilterModal';
 import {
   AppText,
@@ -23,6 +39,7 @@ import {
   EmptyState,
   MeetingCardSkeleton,
   AppHeader,
+  Badge,
 } from '../../src/components/ui';
 import { pullMasterData } from '../../src/database/sync';
 import { homeApi } from '../../src/api/home';
@@ -30,17 +47,57 @@ import { FrontpageStats } from '../../src/api/types';
 import { useAppTheme } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
 import { haptic } from '../../src/utils/haptics';
+import {
+  GeoCoordinates,
+  requestDeviceLocation,
+  calculateHaversineDistance,
+  getMeetingCoordinates,
+  EGYPT_CENTROIDS,
+} from '../../src/utils/location';
+
+const EGYPT_CITY_CENTROID_OPTIONS = [
+  { key: 'cairo', ar: 'القاهرة', en: 'Cairo' },
+  { key: 'giza', ar: 'الجيزة', en: 'Giza' },
+  { key: 'alexandria', ar: 'الإسكندرية', en: 'Alexandria' },
+  { key: 'mansoura', ar: 'المنصورة', en: 'Mansoura' },
+  { key: 'tanta', ar: 'طنطا', en: 'Tanta' },
+  { key: 'zagazig', ar: 'الزقازيق', en: 'Zagazig' },
+  { key: 'ismailia', ar: 'الإسماعيلية', en: 'Ismailia' },
+  { key: 'port said', ar: 'بورسعيد', en: 'Port Said' },
+  { key: 'suez', ar: 'السويس', en: 'Suez' },
+  { key: 'assiut', ar: 'أسيوط', en: 'Assiut' },
+  { key: 'sohag', ar: 'سوهاج', en: 'Sohag' },
+  { key: 'minya', ar: 'المنيا', en: 'Minya' },
+  { key: 'fayoum', ar: 'الفيوم', en: 'Fayoum' },
+  { key: 'beni_suef', ar: 'بني سويف', en: 'Beni Suef' },
+  { key: 'qena', ar: 'قنا', en: 'Qena' },
+  { key: 'luxor', ar: 'الأقصر', en: 'Luxor' },
+  { key: 'aswan', ar: 'أسوان', en: 'Aswan' },
+  { key: 'hurghada', ar: 'الغردقة', en: 'Hurghada' },
+  { key: 'sharm', ar: 'شرم الشيخ', en: 'Sharm El Sheikh' },
+  { key: 'dahab', ar: 'دهب', en: 'Dahab' },
+  { key: 'damietta', ar: 'دمياط', en: 'Damietta' },
+];
 
 export default function MeetingsScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const { colors, isDark } = useAppTheme();
+  const { colors, borderRadius, shadows, isDark } = useAppTheme();
+  const params = useLocalSearchParams<{ nearest?: string }>();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [frontpageStats, setFrontpageStats] = useState<FrontpageStats | null>(null);
+
+  // Nearest Mode States
+  const [isNearestMode, setIsNearestMode] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [userCoordinates, setUserCoordinates] = useState<GeoCoordinates | null>(null);
+  const [selectedCityCenter, setSelectedCityCenter] = useState<string | null>(null);
+  const [nearestDayScope, setNearestDayScope] = useState<'today' | 'all'>('today');
+  const [isCityPickerVisible, setIsCityPickerVisible] = useState(false);
 
   const {
     recentSearches,
@@ -143,6 +200,42 @@ export default function MeetingsScreen() {
     }
   }, [isAr]);
 
+  const handleActivateNearestMode = useCallback(async () => {
+    setIsLocating(true);
+    haptic.selection();
+    const locResult = await requestDeviceLocation();
+    setIsLocating(false);
+
+    if (locResult.status === 'granted' && locResult.coordinates) {
+      setUserCoordinates(locResult.coordinates);
+      setSelectedCityCenter(null);
+      setIsNearestMode(true);
+      haptic.success();
+    } else {
+      // Graceful fallback: set default Cairo center and prompt user to pick their city
+      setUserCoordinates(EGYPT_CENTROIDS.cairo);
+      setSelectedCityCenter(isAr ? 'القاهرة (مركز تقريبي)' : 'Cairo (Approx. Center)');
+      setIsNearestMode(true);
+      setIsCityPickerVisible(true);
+    }
+  }, [isAr]);
+
+  const handleDeactivateNearestMode = useCallback(() => {
+    setIsNearestMode(false);
+    setUserCoordinates(null);
+    setSelectedCityCenter(null);
+    haptic.light();
+  }, []);
+
+  const handleSelectCityCenter = (cityOption: typeof EGYPT_CITY_CENTROID_OPTIONS[0]) => {
+    haptic.selection();
+    const coords = EGYPT_CENTROIDS[cityOption.key] || EGYPT_CENTROIDS.cairo;
+    setUserCoordinates(coords);
+    setSelectedCityCenter(isAr ? cityOption.ar : cityOption.en);
+    setIsNearestMode(true);
+    setIsCityPickerVisible(false);
+  };
+
   useEffect(() => {
     loadDataFromLocalDB();
     pullMasterData().then(() => {
@@ -165,6 +258,13 @@ export default function MeetingsScreen() {
     return () => subscription.unsubscribe();
   }, [loadDataFromLocalDB]);
 
+  // Handle URL param ?nearest=1 when arriving from Home screen
+  useEffect(() => {
+    if (params?.nearest === '1' || params?.nearest === 'true') {
+      handleActivateNearestMode();
+    }
+  }, [params?.nearest, handleActivateNearestMode]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
@@ -173,19 +273,32 @@ export default function MeetingsScreen() {
       homeApi.getStats().then((st) => setFrontpageStats(st)),
     ]);
     await loadDataFromLocalDB();
+    if (isNearestMode && !selectedCityCenter) {
+      const loc = await requestDeviceLocation();
+      if (loc.coordinates) {
+        setUserCoordinates(loc.coordinates);
+      }
+    }
     setIsRefreshing(false);
   };
 
-  const handleSearchSubmit = (text: string) => {
-    setSearchQuery(text);
-    if (text.trim()) {
-      addRecentSearch(text.trim());
-    }
+  const getTodayDayNames = (): { ar: string; en: string } => {
+    const dayIdx = new Date().getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+    const map: Record<number, { ar: string; en: string }> = {
+      6: { ar: 'السبت', en: 'Saturday' },
+      0: { ar: 'الأحد', en: 'Sunday' },
+      1: { ar: 'الاثنين', en: 'Monday' },
+      2: { ar: 'الثلاثاء', en: 'Tuesday' },
+      3: { ar: 'الأربعاء', en: 'Wednesday' },
+      4: { ar: 'الخميس', en: 'Thursday' },
+      5: { ar: 'الجمعة', en: 'Friday' },
+    };
+    return map[dayIdx] || { ar: 'السبت', en: 'Saturday' };
   };
 
-  // Filter calculation
+  // Filter calculation & Distance Ranking
   const filteredMeetings = useMemo(() => {
-    return meetings.filter((m) => {
+    const baseList = meetings.filter((m) => {
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
         query === '' ||
@@ -219,11 +332,64 @@ export default function MeetingsScreen() {
 
       return matchesSearch && matchesDay && matchesCity && matchesGroupType && matchesLang && matchesType;
     });
-  }, [meetings, searchQuery, filters, cities]);
+
+    if (!isNearestMode || !userCoordinates) {
+      return baseList;
+    }
+
+    // Attach calculated distance to each meeting
+    const withDistance = baseList.map((m) => {
+      const coords = getMeetingCoordinates(m);
+      const distanceKm = calculateHaversineDistance(
+        userCoordinates.latitude,
+        userCoordinates.longitude,
+        coords.latitude,
+        coords.longitude
+      );
+      return { ...m, distanceKm };
+    });
+
+    const todayNames = getTodayDayNames();
+
+    if (nearestDayScope === 'today') {
+      const todayMeetings = withDistance.filter((m) => {
+        const dayNameLower = (m.dayName || '').toLowerCase();
+        return (
+          dayNameLower.includes(todayNames.ar.toLowerCase()) ||
+          dayNameLower.includes(todayNames.en.toLowerCase())
+        );
+      });
+
+      if (todayMeetings.length > 0) {
+        return todayMeetings.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+      }
+    }
+
+    // Fallback or All days scope: sort by physical proximity
+    return withDistance.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+  }, [meetings, searchQuery, filters, cities, isNearestMode, userCoordinates, nearestDayScope]);
+
+  // Closest single meeting for Hero Spotlight
+  const closestMeeting = useMemo(() => {
+    if (!isNearestMode || filteredMeetings.length === 0) return null;
+    return filteredMeetings[0];
+  }, [isNearestMode, filteredMeetings]);
 
   // Active filter items for chips
   const activeFilterItems: ActiveFilterItem[] = useMemo(() => {
     const list: ActiveFilterItem[] = [];
+
+    if (isNearestMode) {
+      list.push({
+        key: 'nearest',
+        label: isAr ? 'الموقع' : 'Location',
+        value: selectedCityCenter
+          ? selectedCityCenter
+          : isAr
+          ? 'الأقرب لموقعي (GPS)'
+          : 'Nearest to Me (GPS)',
+      });
+    }
 
     if (filters.dayId) {
       const d = days.find((item) => String(item.id) === String(filters.dayId));
@@ -282,13 +448,18 @@ export default function MeetingsScreen() {
     }
 
     return list;
-  }, [filters, days, cities, isAr]);
+  }, [filters, days, cities, isAr, isNearestMode, selectedCityCenter]);
 
   const handleRemoveFilter = (key: string) => {
+    if (key === 'nearest') {
+      handleDeactivateNearestMode();
+      return;
+    }
     setFilters((prev) => ({ ...prev, [key]: null }));
   };
 
   const handleClearAllFilters = () => {
+    handleDeactivateNearestMode();
     setFilters({
       cityId: null,
       dayId: null,
@@ -319,6 +490,7 @@ export default function MeetingsScreen() {
         isBookmarked={!!bookmarks[item.id]}
         onToggleBookmark={toggleBookmark}
         index={index}
+        distanceKm={item.distanceKm}
       />
     ),
     [bookmarks, toggleBookmark]
@@ -344,6 +516,128 @@ export default function MeetingsScreen() {
               }}
               onClearRecentSearches={clearRecentSearches}
             />
+
+            {/* Quick Action Nearest Mode Bar */}
+            <View style={[styles.nearestBarRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <TouchableOpacity
+                onPress={isNearestMode ? handleDeactivateNearestMode : handleActivateNearestMode}
+                disabled={isLocating}
+                style={[
+                  styles.nearestToggleBtn,
+                  {
+                    backgroundColor: isNearestMode
+                      ? isDark
+                        ? '#0284c7'
+                        : colors.primary
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.1)'
+                      : 'rgba(255, 255, 255, 0.15)',
+                    borderColor: isNearestMode ? '#38bdf8' : 'rgba(255, 255, 255, 0.25)',
+                    flexDirection: isAr ? 'row-reverse' : 'row',
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                {isLocating ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={isAr ? { marginLeft: 6 } : { marginRight: 6 }} />
+                ) : (
+                  <Navigation
+                    size={15}
+                    color="#ffffff"
+                    style={isAr ? { marginLeft: 6 } : { marginRight: 6 }}
+                  />
+                )}
+                <AppText variant="labelSmall" weight="800" color="#ffffff">
+                  {isLocating
+                    ? t('meetings.locating')
+                    : isNearestMode
+                    ? t('meetings.nearest_active')
+                    : t('meetings.nearest_to_me')}
+                </AppText>
+                {isNearestMode && (
+                  <View style={[styles.activeDot, { backgroundColor: '#34d399', marginStart: isAr ? 0 : 6, marginEnd: isAr ? 6 : 0 }]} />
+                )}
+              </TouchableOpacity>
+
+              {isNearestMode && (
+                <TouchableOpacity
+                  onPress={() => setIsCityPickerVisible(true)}
+                  style={[
+                    styles.cityPickerTrigger,
+                    {
+                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.2)',
+                      flexDirection: isAr ? 'row-reverse' : 'row',
+                    },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <MapPin size={13} color="#ffffff" style={isAr ? { marginLeft: 4 } : { marginRight: 4 }} />
+                  <AppText variant="caption" weight="700" color="#ffffff">
+                    {selectedCityCenter || (isAr ? 'تغيير المدينة' : 'Change City')}
+                  </AppText>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Scope Switcher when Nearest Mode is active */}
+            {isNearestMode && (
+              <View style={[styles.scopeSwitcherRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity
+                  onPress={() => {
+                    haptic.selection();
+                    setNearestDayScope('today');
+                  }}
+                  style={[
+                    styles.scopeTab,
+                    nearestDayScope === 'today' && {
+                      backgroundColor: isDark ? '#38bdf8' : '#ffffff',
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    weight="800"
+                    color={
+                      nearestDayScope === 'today'
+                        ? isDark
+                          ? '#0f172a'
+                          : colors.primary
+                        : 'rgba(255, 255, 255, 0.75)'
+                    }
+                  >
+                    {t('meetings.today_only')}
+                  </AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    haptic.selection();
+                    setNearestDayScope('all');
+                  }}
+                  style={[
+                    styles.scopeTab,
+                    nearestDayScope === 'all' && {
+                      backgroundColor: isDark ? '#38bdf8' : '#ffffff',
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    weight="800"
+                    color={
+                      nearestDayScope === 'all'
+                        ? isDark
+                          ? '#0f172a'
+                          : colors.primary
+                        : 'rgba(255, 255, 255, 0.75)'
+                    }
+                  >
+                    {t('meetings.all_days')}
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {activeFilterItems.length > 0 && (
               <FilterChips
                 items={activeFilterItems}
@@ -359,13 +653,15 @@ export default function MeetingsScreen() {
       {/* Content Body */}
       <View style={[styles.contentBody, { backgroundColor: colors.bgPrimary }]}>
         {/* Results Header */}
-        <View style={styles.resultsHeaderRow}>
+        <View style={[styles.resultsHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
           <AppText variant="label" color={isDark ? '#38bdf8' : colors.primary} weight="700">
             {isAr
-              ? `${filteredMeetings.length} اجتماع متاح${frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
-              }`
-              : `${filteredMeetings.length} meetings found${frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
-              }`}
+              ? `${filteredMeetings.length} اجتماع ${isNearestMode ? 'مرتب بالأقرب' : 'متاح'}${
+                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} محافظة)` : ''
+                }`
+              : `${filteredMeetings.length} meetings ${isNearestMode ? 'near you' : 'found'}${
+                  frontpageStats?.governorates ? ` (${frontpageStats.governorates} governorates)` : ''
+                }`}
           </AppText>
           {activeFilterItems.length > 0 && (
             <TouchableOpacity onPress={handleClearAllFilters}>
@@ -405,22 +701,47 @@ export default function MeetingsScreen() {
                 tintColor={colors.accent}
               />
             }
+            ListHeaderComponent={
+              isNearestMode && closestMeeting ? (
+                <ClosestMeetingHero meeting={closestMeeting} />
+              ) : null
+            }
             renderItem={renderMeetingItem}
             ListEmptyComponent={
               <EmptyState
                 icon={<MapPinOff size={44} color={colors.accent} />}
                 title={t('meetings.no_results')}
                 description={
-                  activeFilterItems.length > 0
+                  isNearestMode && nearestDayScope === 'today'
+                    ? isAr
+                      ? 'لا توجد اجتماعات متبقية اليوم في منطقتك. جرب التبديل إلى "جميع الأيام" لمشاهدة أقرب الاجتماعات خلال الأسبوع.'
+                      : 'No more meetings remaining today near you. Try switching to "All Days" to see upcoming meetings this week.'
+                    : activeFilterItems.length > 0
                     ? isAr
                       ? 'لا توجد اجتماعات تطابق الفلاتر المحددة. جرب إزالة بعض الفلاتر أو تغيير كلمة البحث.'
                       : 'No meetings match your selected filters. Try removing some filters or changing search keywords.'
                     : isAr
-                      ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
-                      : 'No meetings found matching your search.'
+                    ? 'لم يتم العثور على اجتماعات مطابقة لبحثك.'
+                    : 'No meetings found matching your search.'
                 }
-                primaryActionTitle={activeFilterItems.length > 0 ? (isAr ? 'إلغاء الفلاتر' : 'Clear Filters') : undefined}
-                onPrimaryAction={activeFilterItems.length > 0 ? handleClearAllFilters : undefined}
+                primaryActionTitle={
+                  isNearestMode && nearestDayScope === 'today'
+                    ? isAr
+                      ? 'عرض جميع الأيام'
+                      : 'View All Days'
+                    : activeFilterItems.length > 0
+                    ? isAr
+                      ? 'إلغاء الفلاتر'
+                      : 'Clear Filters'
+                    : undefined
+                }
+                onPrimaryAction={
+                  isNearestMode && nearestDayScope === 'today'
+                    ? () => setNearestDayScope('all')
+                    : activeFilterItems.length > 0
+                    ? handleClearAllFilters
+                    : undefined
+                }
                 secondaryActionTitle={searchQuery ? (isAr ? 'مسح البحث' : 'Clear Search') : undefined}
                 onSecondaryAction={searchQuery ? () => setSearchQuery('') : undefined}
               />
@@ -438,6 +759,114 @@ export default function MeetingsScreen() {
         cities={cities}
         days={days}
       />
+
+      {/* City Center Picker Modal (Location Fallback) */}
+      <Modal
+        visible={isCityPickerVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsCityPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}
+            onPress={() => setIsCityPickerVisible(false)}
+          />
+          <View
+            style={[
+              styles.citySheetContainer,
+              shadows.bottomSheet,
+              {
+                backgroundColor: colors.cardBg,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+              },
+            ]}
+          >
+            {/* Sheet Header */}
+            <View style={[styles.sheetHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start', flex: 1 }}>
+                <AppText variant="h3" weight="800" color={colors.textPrimary}>
+                  {isAr ? 'اختر المدينة كمركز للبحث' : 'Select City Reference'}
+                </AppText>
+                <AppText variant="caption" color={colors.textSecondary}>
+                  {isAr
+                    ? 'سيتم حساب أقرب الاجتماعات بالنسبة لمركز المدينة المختارة'
+                    : 'Nearest meetings will be calculated relative to the chosen city'}
+                </AppText>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsCityPickerVisible(false)}
+                style={styles.closeSheetBtn}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Use GPS Button */}
+            <TouchableOpacity
+              onPress={handleActivateNearestMode}
+              style={[
+                styles.gpsQuickBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : colors.primaryLight + '20',
+                  borderColor: isDark ? '#38bdf8' : colors.primary,
+                  flexDirection: isAr ? 'row-reverse' : 'row',
+                },
+              ]}
+            >
+              <Navigation size={18} color={isDark ? '#38bdf8' : colors.primary} />
+              <AppText
+                variant="label"
+                weight="800"
+                color={isDark ? '#38bdf8' : colors.primary}
+                style={isAr ? { marginRight: 8 } : { marginLeft: 8 }}
+              >
+                {isAr ? 'استخدام موقع GPS الحالي' : 'Use Live GPS Location'}
+              </AppText>
+            </TouchableOpacity>
+
+            {/* City Options List */}
+            <ScrollView
+              style={{ maxHeight: 360 }}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 24 }}
+            >
+              {EGYPT_CITY_CENTROID_OPTIONS.map((c) => {
+                const isSelected = selectedCityCenter === (isAr ? c.ar : c.en);
+                return (
+                  <TouchableOpacity
+                    key={c.key}
+                    onPress={() => handleSelectCityCenter(c)}
+                    style={[
+                      styles.cityItemRow,
+                      {
+                        borderBottomColor: colors.borderSubtle,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                      isSelected && {
+                        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : colors.accentLight,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.cityTextCol, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                      <AppText variant="body" weight="700" color={colors.textPrimary}>
+                        {isAr ? c.ar : c.en}
+                      </AppText>
+                      <AppText variant="caption" color={colors.textMuted}>
+                        {isAr ? c.en : c.ar}
+                      </AppText>
+                    </View>
+                    {isSelected && (
+                      <Check size={18} color={isDark ? '#38bdf8' : colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -449,6 +878,47 @@ const styles = StyleSheet.create({
   filterChipsRow: {
     marginTop: 6,
     paddingBottom: 2,
+  },
+  nearestBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  nearestToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  activeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  cityPickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+  },
+  scopeSwitcherRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 10,
+    padding: 3,
+    marginTop: 8,
+    gap: 4,
+  },
+  scopeTab: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
   },
   contentBody: {
     flex: 1,
@@ -467,5 +937,51 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
     paddingTop: 6,
+    paddingBottom: 28,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  citySheetContainer: {
+    padding: 18,
+    maxHeight: '80%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  closeSheetBtn: {
+    padding: 6,
+  },
+  gpsQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  cityItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderRadius: 8,
+  },
+  cityTextCol: {
+    flex: 1,
   },
 });

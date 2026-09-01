@@ -34,6 +34,7 @@ import {
   scheduleMeetingReminder,
   cancelMeetingReminder,
 } from '../services/notifications';
+import { formatDistance } from '../utils/location';
 
 export interface MeetingCardProps {
   meetingId: string;
@@ -54,6 +55,7 @@ export interface MeetingCardProps {
   isBookmarked: boolean;
   onToggleBookmark: (id: string) => void;
   index?: number;
+  distanceKm?: number;
 }
 
 const MeetingCardComponent: React.FC<MeetingCardProps> = ({
@@ -75,6 +77,7 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
   isBookmarked,
   onToggleBookmark,
   index = 0,
+  distanceKm,
 }) => {
   const { colors, spacing, borderRadius, shadows, isDark } = useAppTheme();
   const { t, i18n } = useTranslation();
@@ -199,6 +202,13 @@ const MeetingCardComponent: React.FC<MeetingCardProps> = ({
         {/* Card Header: Day & Online Status + Action Icons */}
         <View style={[styles.headerRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
           <View style={[styles.badgeRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            {distanceKm !== undefined && (
+              <Badge
+                label={`📍 ${formatDistance(distanceKm, isAr)}`}
+                variant="accent"
+                size="sm"
+              />
+            )}
             <Badge label={dayName} variant="gold" size="sm" />
             <Badge
               label={isOpen ? t('meetings.type_open') : t('meetings.type_closed')}

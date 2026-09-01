@@ -23,6 +23,7 @@ import {
   Clock,
   ArrowUpRight,
   HeartHandshake,
+  Navigation,
 } from 'lucide-react-native';
 import { AppText, Badge, AppHeader } from '../../src/components/ui';
 import { JftModal } from '../../src/components/JftModal';
@@ -272,8 +273,56 @@ export default function HomeScreen() {
 
         {/* Quick Action Navigation Cards */}
         <View style={styles.quickLinksRow}>
+          {/* Card 1: Nearest Meeting to Me (Spotlight) */}
           <TouchableOpacity
-            style={[styles.quickLinkCard, { backgroundColor: isDark ? colors.cardElevated : colors.primaryDark, flexDirection: isAr ? 'row-reverse' : 'row' }]}
+            style={[
+              styles.quickLinkCard,
+              shadows.card,
+              {
+                backgroundColor: isDark ? '#0c2a3e' : '#0369a1',
+                borderColor: isDark ? '#0284c7' : '#38bdf8',
+                borderWidth: 1.5,
+                marginBottom: 10,
+                flexDirection: isAr ? 'row-reverse' : 'row',
+              },
+            ]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/meetings?nearest=1');
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.quickLinkContent, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <View
+                style={[
+                  styles.quickLinkIconCircle,
+                  { backgroundColor: isDark ? 'rgba(34, 211, 238, 0.25)' : 'rgba(255, 255, 255, 0.2)' },
+                  isAr ? { marginLeft: 12 } : { marginRight: 12 },
+                ]}
+              >
+                <Navigation size={22} color={isDark ? '#22d3ee' : '#ffffff'} />
+              </View>
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start', flex: 1 }}>
+                <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                  <AppText variant="label" color="#ffffff" weight="800">
+                    {isAr ? 'أقرب اجتماع لي' : 'Nearest Meeting to Me'}
+                  </AppText>
+                  <Badge label={isAr ? 'GPS' : 'GPS'} variant="accent" size="sm" />
+                </View>
+                <AppText variant="caption" color="rgba(224, 248, 252, 0.9)" style={{ marginTop: 2 }}>
+                  {isAr ? 'اعثر فوراً على أقرب اجتماع قادم لموقعك' : 'Find the closest upcoming meeting to your location'}
+                </AppText>
+              </View>
+            </View>
+            <ArrowUpRight size={20} color="#ffffff" style={{ transform: [{ scaleX: isAr ? -1 : 1 }] }} />
+          </TouchableOpacity>
+
+          {/* Card 2: Full Directory Search */}
+          <TouchableOpacity
+            style={[
+              styles.quickLinkCard,
+              { backgroundColor: isDark ? colors.cardElevated : colors.primaryDark, flexDirection: isAr ? 'row-reverse' : 'row' },
+            ]}
             onPress={() => {
               haptic.selection();
               router.push('/(tabs)/meetings');
@@ -281,13 +330,21 @@ export default function HomeScreen() {
             activeOpacity={0.85}
           >
             <View style={[styles.quickLinkContent, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-              <MapPin size={22} color="#ffffff" style={{ marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }} />
-              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+              <View
+                style={[
+                  styles.quickLinkIconCircle,
+                  { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+                  isAr ? { marginLeft: 12 } : { marginRight: 12 },
+                ]}
+              >
+                <MapPin size={20} color="#ffffff" />
+              </View>
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start', flex: 1 }}>
                 <AppText variant="label" color="#ffffff" weight="800">
-                  {isAr ? 'البحث عن اجتماع الآن' : 'Find a Meeting Now'}
+                  {isAr ? 'دليل جميع الاجتماعات' : 'Browse All Meetings'}
                 </AppText>
-                <AppText variant="caption" color="rgba(224, 248, 252, 0.85)">
-                  {isAr ? 'حسب اليوم والمحافظة والمنطقة' : 'By day, city & location'}
+                <AppText variant="caption" color="rgba(224, 248, 252, 0.85)" style={{ marginTop: 2 }}>
+                  {isAr ? 'تصفح حسب اليوم والمحافظة والمنطقة' : 'Filter by day, city & format'}
                 </AppText>
               </View>
             </View>
@@ -510,6 +567,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  quickLinkIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   jftCard: {
     padding: 16,
