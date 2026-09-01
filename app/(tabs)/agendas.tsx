@@ -452,7 +452,7 @@ export default function AgendasScreen() {
               </AppText>
               <AppText variant="body" color={colors.textSecondary} style={{ textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
                 {isAr
-                  ? 'هذا القسم مخصص للخدام المعتمدين في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ naegypt.org. للاطلاع على البيانات والتقارير المتاحة لخدمتك.'
+                  ? 'هذا القسم مخصص للخدم المؤتمن في زمالة المدمنين المجهولين في مصر. يرجى تسجيل الدخول بحساب Microsoft المؤسسي المرتبط بـ naegypt.org. للاطلاع على البيانات والتقارير المتاحة لخدمتك.'
                   : 'This section is strictly restricted to verified NA Egypt servants. Please sign in with your official naegypt.org Microsoft account to access reports and agendas permitted for your role.'}
               </AppText>
               <AppButton
