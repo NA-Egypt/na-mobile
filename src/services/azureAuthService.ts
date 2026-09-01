@@ -68,7 +68,7 @@ export const azureAuthService = {
         usePKCE: true,
         prompt: AuthSession.Prompt.SelectAccount, // Account chooser prompt
         extraParams: {
-          domain_hint: 'egyptna.org',
+          domain_hint: 'naegypt.org',
         },
       });
 
@@ -153,7 +153,7 @@ export const azureAuthService = {
   async loginWithBackendRedirect(): Promise<LoginResult> {
     try {
       const redirectUri = 'naegypt://auth-callback';
-      const authUrl = `https://egyptna.org/auth/azure/redirect?redirect_uri=${encodeURIComponent(
+      const authUrl = `https://naegypt.org/auth/azure/redirect?redirect_uri=${encodeURIComponent(
         redirectUri
       )}`;
 

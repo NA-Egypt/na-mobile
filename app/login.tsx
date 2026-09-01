@@ -258,7 +258,7 @@ export default function LoginScreen() {
             <View style={styles.featureItem}>
               <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
               <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'خاص ومقيد بحسابات @egyptna.org المعتمدة' : 'Exclusive to verified @egyptna.org accounts'}
+                {isAr ? 'خاص ومقيد بحسابات @naegypt.org المعتمدة' : 'Exclusive to verified @naegypt.org accounts'}
               </AppText>
             </View>
           </View>

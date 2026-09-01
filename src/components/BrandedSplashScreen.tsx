@@ -87,7 +87,7 @@ export const BrandedSplashScreen: React.FC<BrandedSplashScreenProps> = ({ onFini
         </Animated.View>
 
         <View style={styles.footerInfo}>
-          <Text style={styles.footerUrl}>egyptna.org</Text>
+          <Text style={styles.footerUrl}>naegypt.org</Text>
         </View>
       </Animated.View>
     </Animated.View>

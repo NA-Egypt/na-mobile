@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { ApiResponse, FrontpageData, JftData, FrontpageStats, Meeting, MeetingQueryFilters } from './types';
 
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://egyptna.org/api/v1';
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://naegypt.org/api/v1';
 
 export const TOKEN_STORAGE_KEY = 'na_egypt_sanctum_token';
 export const USER_STORAGE_KEY = 'na_egypt_user_data';

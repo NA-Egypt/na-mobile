@@ -103,7 +103,7 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
     if (!jft) return;
     haptic.selection();
     try {
-      const shareMessage = `📖 ${jft.title || 'لليوم فقط'}\n${jft.page_date ? `📅 ${jft.page_date}\n` : ''}\n"${jft.quote || ''}"\n— ${jft.quote_source || 'زمالة المدمنين المجهولين'}\n\n${(jft.content || []).join('\n\n')}\n\n✨ ${jft.thought_for_the_day || ''}\n\n📱 تطبيق زمالة المدمنين المجهولين\nhttps://egyptna.org`;
+      const shareMessage = `📖 ${jft.title || 'لليوم فقط'}\n${jft.page_date ? `📅 ${jft.page_date}\n` : ''}\n"${jft.quote || ''}"\n— ${jft.quote_source || 'زمالة المدمنين المجهولين'}\n\n${(jft.content || []).join('\n\n')}\n\n✨ ${jft.thought_for_the_day || ''}\n\n📱 تطبيق زمالة المدمنين المجهولين\nhttps://naegypt.org`;
       await Share.share({
         message: shareMessage,
         title: jft.title || 'لليوم فقط - NA Egypt',
