@@ -267,6 +267,7 @@ export async function pullMasterData(): Promise<void> {
             matchedGroup?.location ||
             item.location ||
             item.location_url ||
+            item.meeting_url ||
             item.map_url ||
             item.google_maps_url ||
             '';

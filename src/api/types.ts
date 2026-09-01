@@ -144,6 +144,7 @@ export interface Meeting {
   address_en?: string;
   location?: string;
   location_url?: string;
+  meeting_url?: string;
   city_name_ar?: string;
   city_name_en?: string;
   neighborhood_name_ar?: string;
