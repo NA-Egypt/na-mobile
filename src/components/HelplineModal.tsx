@@ -85,26 +85,25 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
   // Hidden 5-tap gesture to reveal Helpline Call Logger
   const [isCallLoggerVisible, setIsCallLoggerVisible] = useState(false);
-  const [tapCount, setTapCount] = useState(0);
+  const tapCountRef = React.useRef<number>(0);
   const lastTapTimeRef = React.useRef<number>(0);
 
   const handleHeaderTap = () => {
     const now = Date.now();
     if (now - lastTapTimeRef.current < 2500) {
-      const nextCount = tapCount + 1;
-      if (nextCount >= 5) {
-        haptic.success();
-        setTapCount(0);
-        setIsCallLoggerVisible(true);
-      } else {
-        haptic.light();
-        setTapCount(nextCount);
-      }
+      tapCountRef.current += 1;
     } else {
-      haptic.light();
-      setTapCount(1);
+      tapCountRef.current = 1;
     }
     lastTapTimeRef.current = now;
+
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      haptic.success();
+      setIsCallLoggerVisible(true);
+    } else {
+      haptic.light();
+    }
   };
 
   const fetchHelplines = async () => {
@@ -195,7 +194,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
   return (
     <>
-      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <Modal visible={visible && !isCallLoggerVisible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}>

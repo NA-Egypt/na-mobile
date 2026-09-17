@@ -49,6 +49,8 @@ import { reportsApi } from '../../src/api/reports';
 import { groupsApi } from '../../src/api/groups';
 import { lookupsApi } from '../../src/api/lookups';
 import { Group, ServiceBody } from '../../src/api/types';
+import { database } from '../../src/database';
+import GroupModel from '../../src/database/models/Group';
 import { SubmitAgendaModal } from '../../src/components/SubmitAgendaModal';
 import { azureAuthService } from '../../src/services/azureAuthService';
 import { useAppTheme } from '../../src/theme';
@@ -157,23 +159,50 @@ export default function AgendasScreen() {
       ]);
 
       if (groupsRes.status === 'fulfilled') {
-        const gList = groupsRes.value;
-        if (Array.isArray(gList)) {
+        const raw = groupsRes.value;
+        const gList: Group[] = Array.isArray(raw)
+          ? raw
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data
+            : [];
+        const gMap: Record<number, Group> = {};
+        if (gList.length > 0) {
           setAllGroups(gList);
-          const gMap: Record<number, Group> = {};
           gList.forEach((g) => {
-            if (g.id) gMap[g.id] = g;
+            if (g.id) gMap[Number(g.id)] = g;
           });
-          setGroupsMap(gMap);
         }
+        // Augment groupsMap with local WatermelonDB groups cache
+        try {
+          const localGroups = await database.get<GroupModel>('groups').query().fetch();
+          localGroups.forEach((lg) => {
+            const idNum = Number(lg.remoteId);
+            if (idNum && !gMap[idNum]) {
+              gMap[idNum] = {
+                id: idNum,
+                ar_name: lg.name || '',
+                en_name: lg.name || '',
+                group_type: lg.groupType,
+              } as any;
+            }
+          });
+        } catch (dbErr) {
+          // Ignore local db query error
+        }
+        setGroupsMap(gMap);
       }
 
       if (sbListRes.status === 'fulfilled') {
-        const sbList = sbListRes.value;
-        if (Array.isArray(sbList)) {
+        const raw = sbListRes.value;
+        const sbList: ServiceBody[] = Array.isArray(raw)
+          ? raw
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data
+            : [];
+        if (sbList.length > 0) {
           const sMap: Record<number, ServiceBody> = {};
           sbList.forEach((sb) => {
-            if (sb.id) sMap[sb.id] = sb;
+            if (sb.id) sMap[Number(sb.id)] = sb;
           });
           setServiceBodiesMap(sMap);
         }
@@ -343,19 +372,71 @@ export default function AgendasScreen() {
   };
 
   const userRoles = Array.isArray(user?.roles)
-    ? user.roles.map((r: any) => (typeof r === 'string' ? r : r.name || '').toLowerCase())
+    ? user.roles.map((r: any) =>
+        (typeof r === 'string' ? r : r.name || r.slug || '').toLowerCase()
+      )
     : [];
-  const hasGsrRole = userRoles.some((r) => r.includes('gsr') || r.includes('group'));
-  const userAssociatedGroup = allGroups.find(
-    (g) => g.user?.id === user?.id || (g as any).user_id === user?.id
+  const hasGsrRole = userRoles.some(
+    (r) => r.includes('gsr') || r.includes('group') || r.includes('مجموعة')
   );
-  const isGroupUser = Boolean(hasGsrRole || userAssociatedGroup);
+
+  // Strategy 1: Direct group_id on user profile
+  const directUserGroupId = (user as any)?.group_id || (user as any)?.group?.id;
+
+  // Strategy 2: Multi-strategy matching in allGroups (by ID, email, name)
+  const userAssociatedGroup = allGroups.find((g) => {
+    if (directUserGroupId && Number(g.id) === Number(directUserGroupId)) return true;
+    if (user?.id && (g.user?.id === user.id || (g as any).user_id === user.id)) return true;
+    if (user?.email) {
+      const uEmail = user.email.toLowerCase();
+      const gEmail = (g as any).email?.toLowerCase();
+      if (gEmail && uEmail === gEmail) return true;
+      const cleanEn = (g.en_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanEn && uEmail.includes(cleanEn)) return true;
+    }
+    if (user?.name) {
+      const uName = user.name.trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+      const gAr = (g.ar_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+      const gEn = (g.en_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+      if (uName && (uName === gAr || uName === gEn)) return true;
+    }
+    return false;
+  });
+
+  const targetGroupId = directUserGroupId || userAssociatedGroup?.id;
+
+  // Group User flag: User is a GSR or linked to a specific group
+  const isGroupUser = Boolean(
+    hasGsrRole ||
+    targetGroupId ||
+    userAssociatedGroup ||
+    user?.email?.toLowerCase().includes('group') ||
+    user?.name?.includes('مجموعة')
+  );
+
+  // Strict role filtering: Group servants strictly see only their group agendas
+  const filteredGroupAgendas = isGroupUser
+    ? groupAgendas.filter((a) => {
+        if (targetGroupId && Number(a.group_id) === Number(targetGroupId)) {
+          return true;
+        }
+        if (a.user_id && user?.id && Number(a.user_id) === Number(user.id)) {
+          return true;
+        }
+        if (
+          a.submitter_name &&
+          user?.name &&
+          a.submitter_name.trim().toLowerCase() === user.name.trim().toLowerCase()
+        ) {
+          return true;
+        }
+        return false;
+      })
+    : groupAgendas;
 
   const currentList = (
     activeTab === 'groups'
-      ? (isGroupUser && userAssociatedGroup?.id
-          ? groupAgendas.filter((a) => a.group_id === userAssociatedGroup.id)
-          : groupAgendas)
+      ? filteredGroupAgendas
       : activeTab === 'service_bodies'
         ? serviceBodyAgendas
         : committeeReports
@@ -784,17 +865,43 @@ export default function AgendasScreen() {
                 const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
                 const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
 
-                const groupObj = item.group || groupsMap[item.group_id];
+                const groupObj =
+                  item.group ||
+                  groupsMap[Number(item.group_id)] ||
+                  groupsMap[item.group_id];
                 const rawGroupName =
+                  item.group_name ||
+                  item.group_name_ar ||
+                  item.group_name_en ||
+                  item.group?.ar_name ||
+                  item.group?.en_name ||
+                  item.group?.name ||
                   (isAr ? groupObj?.ar_name : groupObj?.en_name) ||
                   groupObj?.ar_name ||
                   groupObj?.en_name ||
-                  item.group_name;
-                const groupTitle = rawGroupName
-                  ? (rawGroupName.includes('مجموعة') || !isAr ? rawGroupName : `مجموعة ${rawGroupName}`)
-                  : (isAr ? `مجموعة رقم #${item.group_id}` : `Group #${item.group_id}`);
-                const sbObj = groupObj?.service_body || (groupObj?.service_body_id ? serviceBodiesMap[groupObj.service_body_id] : null);
-                const areaName = (isAr ? sbObj?.ar_name : sbObj?.en_name) || sbObj?.ar_name || sbObj?.en_name;
+                  (groupObj as any)?.name;
+
+                let groupTitle = '';
+                if (rawGroupName) {
+                  if (isAr) {
+                    groupTitle = rawGroupName.startsWith('مجموعة') ? rawGroupName : `مجموعة ${rawGroupName}`;
+                  } else {
+                    groupTitle = rawGroupName.toLowerCase().includes('group') ? rawGroupName : `${rawGroupName} Group`;
+                  }
+                } else {
+                  groupTitle = isAr ? `مجموعة رقم #${item.group_id}` : `Group #${item.group_id}`;
+                }
+
+                const sbObj =
+                  item.group?.service_body ||
+                  groupObj?.service_body ||
+                  (groupObj?.service_body_id ? serviceBodiesMap[Number(groupObj.service_body_id)] : null) ||
+                  (item.service_body_id ? serviceBodiesMap[Number(item.service_body_id)] : null);
+                const areaName =
+                  (isAr ? sbObj?.ar_name : sbObj?.en_name) ||
+                  sbObj?.ar_name ||
+                  sbObj?.en_name ||
+                  item.service_body_name;
 
                 return (
                   <View
@@ -1014,11 +1121,19 @@ export default function AgendasScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon={<FolderX size={44} color={colors.accent} />}
-                title={isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section'}
+                title={
+                  activeTab === 'groups' && isGroupUser
+                    ? (isAr ? 'لا توجد جداول أعمال مسجلة لمجموعتك بعد' : 'No agendas recorded for your group yet')
+                    : (isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section')
+                }
                 description={
-                  isAr
-                    ? 'يتم عرض تقارير وأرشيف اللجان وجداول الأعمال مباشرة من الخادم وفقاً لصلاحيات حسابك المعتمد.'
-                    : 'Agendas and Committee records load directly from the server according to your verified account permissions.'
+                  activeTab === 'groups' && isGroupUser
+                    ? (isAr
+                        ? 'يمكنك تقديم تقرير جدول أعمال جديد لمجموعتك من خلال زر "تقديم أجندة جديدة" أعلاه.'
+                        : 'You can submit a new business agenda report for your group using the button above.')
+                    : (isAr
+                        ? 'يتم عرض تقارير وأرشيف اللجان وجداول الأعمال مباشرة من الخادم وفقاً لصلاحيات حسابك المعتمد.'
+                        : 'Agendas and Committee records load directly from the server according to your verified account permissions.')
                 }
               />
             }

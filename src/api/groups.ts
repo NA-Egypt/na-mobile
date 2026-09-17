@@ -11,15 +11,18 @@ export const groupsApi = {
   /**
    * Retrieves groups collection with pagination & relations.
    */
-  async getGroups(filters?: GroupQueryFilters): Promise<PaginatedResponse<Group> | Group[]> {
+  async getGroups(filters?: GroupQueryFilters): Promise<Group[]> {
     const params = {
       per_page: 100,
       ...(filters || {}),
     };
-    const response = await apiClient.get<PaginatedResponse<Group> | Group[]>('/groups', {
+    const response = await apiClient.get<PaginatedResponse<Group> | ApiResponse<Group[]> | Group[]>('/groups', {
       params,
     });
-    return response.data;
+    const resData: any = response.data;
+    if (Array.isArray(resData)) return resData;
+    if (Array.isArray(resData?.data)) return resData.data;
+    return [];
   },
 
   /**

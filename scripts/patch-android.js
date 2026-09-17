@@ -29,6 +29,15 @@ if (fs.existsSync(utilsRb)) {
 });
 
 // 2. Patch Gradle Kotlin Plugins with -Xskip-metadata-version-check
+const rnSettingsKts = 'node_modules/@react-native/gradle-plugin/settings.gradle.kts';
+if (fs.existsSync(rnSettingsKts)) {
+  let c = fs.readFileSync(rnSettingsKts, 'utf8');
+  if (c.includes('id("org.gradle.toolchains.foojay-resolver-convention")')) {
+    c = c.replace(/plugins\s*\{\s*id\("org\.gradle\.toolchains\.foojay-resolver-convention"\)\.version\([^)]+\)\s*\}/g, '// plugins { id("org.gradle.toolchains.foojay-resolver-convention") }');
+    fs.writeFileSync(rnSettingsKts, c);
+  }
+}
+
 const ktsFiles = [
   'node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-max-sdk-override-plugin/build.gradle.kts',
   'node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/build.gradle.kts',

@@ -56,3 +56,4 @@ Thumbs.db
 *.tsbuildinfo
 *.log
 .npm
+release_creds.md

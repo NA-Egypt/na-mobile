@@ -28,6 +28,7 @@ import {
 import { AppText, Badge, AppHeader } from '../../src/components/ui';
 import { JftModal } from '../../src/components/JftModal';
 import { HelplineModal } from '../../src/components/HelplineModal';
+import { HelplineCallLoggerModal } from '../../src/components/HelplineCallLoggerModal';
 import { homeApi } from '../../src/api/home';
 import { FrontpageStats, JftData, HelplineItem } from '../../src/api/types';
 import { useAppTheme } from '../../src/theme';
@@ -42,6 +43,28 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isJftVisible, setIsJftVisible] = useState(false);
   const [isHelplineVisible, setIsHelplineVisible] = useState(false);
+  const [isCallLoggerVisible, setIsCallLoggerVisible] = useState(false);
+
+  const homeTapCountRef = React.useRef<number>(0);
+  const homeLastTapTimeRef = React.useRef<number>(0);
+
+  const handleHelplineHeaderTap = () => {
+    const now = Date.now();
+    if (now - homeLastTapTimeRef.current < 2500) {
+      homeTapCountRef.current += 1;
+    } else {
+      homeTapCountRef.current = 1;
+    }
+    homeLastTapTimeRef.current = now;
+
+    if (homeTapCountRef.current >= 5) {
+      homeTapCountRef.current = 0;
+      haptic.success();
+      setIsCallLoggerVisible(true);
+    } else {
+      haptic.light();
+    }
+  };
 
   const [stats, setStats] = useState<FrontpageStats>({
     weekly_meetings: 78,
@@ -402,12 +425,18 @@ export default function HomeScreen() {
 
         {/* Helplines Section (خطوط المساعدة) */}
         <View style={[styles.sectionHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-          <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <TouchableOpacity
+            style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}
+            onPress={handleHelplineHeaderTap}
+            activeOpacity={0.8}
+            accessibilityRole="header"
+            accessibilityLabel={isAr ? 'خطوط المساعدة في مصر' : 'Regional Helplines'}
+          >
             <PhoneCall size={18} color={isDark ? '#22d3ee' : colors.accentDark} />
             <AppText variant="h3" color={colors.textPrimary} weight="800">
               {isAr ? 'خطوط المساعدة في مصر' : 'Regional Helplines'}
             </AppText>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
               haptic.selection();
@@ -477,6 +506,12 @@ export default function HomeScreen() {
       <HelplineModal
         visible={isHelplineVisible}
         onClose={() => setIsHelplineVisible(false)}
+      />
+
+      {/* Volunteer Helpline Call Logger Modal */}
+      <HelplineCallLoggerModal
+        visible={isCallLoggerVisible}
+        onClose={() => setIsCallLoggerVisible(false)}
       />
     </View>
   );
