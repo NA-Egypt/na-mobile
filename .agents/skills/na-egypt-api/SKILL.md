@@ -1,6 +1,6 @@
 ---
 name: na-egypt-api
-description: Comprehensive REST API reference, endpoints catalog, and integration guide for NA-Egypt backend services (Authentication, Meetings, Groups, Agendas, Events, and Service Bodies).
+description: Comprehensive REST API reference, endpoints catalog, and integration guide for NA-Egypt backend services (Authentication, Meetings, Groups, Agendas, Events, Workgroups, Change Requests, Custom Forms, Helpline Calls, and Service Bodies).
 ---
 
 # NA-Egypt Backend REST API Reference & Integration Guide
@@ -12,17 +12,17 @@ This skill provides a complete reference for integrating mobile applications (an
 ## 1. General API Architecture & Conventions
 
 - **Base URL:** `https://<domain>/api/v1`
-- **Content-Type:** `application/json`
+- **Content-Type:** `application/json` (or `multipart/form-data` for endpoints with file uploads)
 - **Accept:** `application/json`
 - **Authentication Scheme:** `Bearer <sanctum_token>` via HTTP `Authorization` header.
 - **HTTP Status Codes:**
   - `200 OK`: Successful read or update.
-  - `201 Created`: Resource successfully created across all `store()` endpoints.
-  - `204 No Content`: Resource deleted successfully.
+  - `201 Created`: Resource successfully created across all `store()` and public submission endpoints.
+  - `204 No Content`: Resource deleted successfully or token revoked on logout.
   - `400 Bad Request`: Malformed request or missing OAuth attributes.
   - `401 Unauthorized`: Missing or invalid Bearer token / Azure OAuth token.
   - `403 Forbidden`: Insufficient role or permissions.
-  - `404 Not Found`: Resource ID does not exist.
+  - `404 Not Found`: Resource ID or slug does not exist.
   - `422 Unprocessable Content`: Validation failure (includes validation error dictionary in response body).
 
 ---
@@ -68,6 +68,11 @@ Mobile apps authenticate the user via Azure Active Directory / Microsoft Identit
   }
   ```
 
+#### `POST /api/v1/auth/logout` (or `/api/v1/logout`)
+Revokes the current user's Sanctum personal access token.
+- **Access:** Authenticated (`Bearer <sanctum_token>`)
+- **Response (204 No Content)**
+
 #### `GET /auth/azure/redirect` *(Web Browser OAuth Fallback)*
 - **Access:** Public
 - **Query Parameters:**
@@ -101,60 +106,6 @@ Fetches all aggregated frontpage data in one consolidated response (stats, daily
 - **Access:** Public
 - **Query Parameters:**
   - `date` *(optional)*: `YYYY-MM-DD`
-- **Response (200 OK):**
-  ```json
-  {
-    "data": {
-      "stats": {
-        "weekly_meetings": 142,
-        "total_meetings": 160,
-        "in_person_groups": 45,
-        "online_groups": 12,
-        "groups": 45,
-        "total_groups": 57,
-        "governorates": 14,
-        "cities": 14,
-        "upcoming_events": 3
-      },
-      "jft": {
-        "date": "2026-08-17",
-        "page_date": "17 أغسطس",
-        "title": "الامتنان اليومي",
-        "quote": "أنا ممتن جداً...",
-        "quote_source": "النص الأساسي - ص.42",
-        "content": ["الفقرة الأولى..."],
-        "thought_for_the_day": "لليوم فقط: سأحافظ على صلتي الواعية بقوتي العظمى.",
-        "content_html": "<p>...</p>"
-      },
-      "helplines": [
-        {
-          "region": "Egypt Region (General)",
-          "region_ar": "إقليم مصر (عام)",
-          "phones": ["+201006979198", "+201060933888"],
-          "whatsapp": "https://wa.me/201060933888",
-          "hours": "10 AM - 12 Midnight",
-          "hours_ar": "١٠ ص - ١٢ منتصف الليل"
-        },
-        {
-          "region": "Alexandria",
-          "region_ar": "الإسكندرية",
-          "phones": ["+201503884411"],
-          "whatsapp": "https://wa.me/201503884411",
-          "hours": "12 PM - 10 PM",
-          "hours_ar": "١٢ م - ١٠ م"
-        }
-      ],
-      "social_links": {
-        "facebook": "https://www.facebook.com/OfficialNAEgyPage",
-        "instagram": "https://www.instagram.com/narcoticsanonymousegy",
-        "tiktok": "https://www.tiktok.com/@narcoticsanonymousegypt",
-        "whatsapp": "https://wa.me/201060933888",
-        "email": "pr@naegypt.org"
-      },
-      "upcoming_events": []
-    }
-  }
-  ```
 
 #### `GET /api/v1/jft`
 Retrieves daily spiritual reflection (Just For Today) with structured parsed fields and clean HTML.
@@ -192,72 +143,14 @@ Query parameters for filtering meetings:
 - `virtualOnly`: `1` or `true` to filter online/virtual meetings
 - `englishOnly`: `1` or `true` to filter meetings conducted in English
 
-**Response (200 OK):**
-```json
-{
-  "data": [
-    {
-      "id": 10,
-      "day_id": 1,
-      "group_id": 3,
-      "direct_online_group_id": null,
-      "type": "open",
-      "lang": "arabic",
-      "status": "available",
-      "start_time": "19:30:00",
-      "end_time": "21:00:00",
-      "formatted_start_time": "07:30 PM",
-      "formatted_end_time": "09:00 PM",
-      "duration": 90,
-      "notes": "Wheelchair accessible",
-      "recurrence": ["weekly"],
-
-      "group_name_ar": "مجموعة الأمل",
-      "group_name_en": "Hope Group",
-      "group_type": "in_person",
-      "address_ar": "وسط البلد، القاهرة",
-      "address_en": "Downtown, Cairo",
-      "location_url": "https://maps.google.com/?q=30.0444,31.2357",
-      "meeting_url": "https://maps.google.com/?q=30.0444,31.2357",
-
-      "neighborhood_id": 1,
-      "neighborhood_name_ar": "وسط البلد",
-      "neighborhood_name_en": "Downtown",
-      "city_id": 1,
-      "city_name_ar": "القاهرة",
-      "city_name_en": "Cairo",
-
-      "day": { "id": 1, "ar_name": "السبت", "en_name": "Saturday" },
-      "topics": [{ "id": 1, "ar_name": "خطوة أولى", "en_name": "Step 1" }],
-      "options": [{ "id": 2, "ar_name": "مفتوح", "en_name": "Open" }]
-    }
-  ]
-}
-```
-
 #### `GET /api/v1/meetings/{id}`
 Returns a single meeting object with loaded relations (`group`, `day`, `topics`, `options`).
 
 #### `POST /api/v1/meetings` *(Auth Required)*
-- **Body Schema:**
-  ```json
-  {
-    "group_id": 3,
-    "day_id": 1,
-    "start_time": "19:30:00",
-    "end_time": "21:00:00",
-    "type": "open",
-    "lang": "arabic",
-    "status": "available",
-    "notes": "Optional notes",
-    "topics": [1, 2],
-    "options": [3]
-  }
-  ```
 - **Response (201 Created):** Single `MeetingResource` object.
 
 #### `PUT /api/v1/meetings/{id}` *(Auth Required)*
-Updates meeting attributes (fields are `sometimes|required`).
+Updates meeting attributes (`sometimes|required`).
 
 #### `DELETE /api/v1/meetings/{id}` *(Auth Required)*
 - **Response (204 No Content)**
@@ -301,175 +194,133 @@ Returns details of the specified group.
 
 ---
 
-### 3.3 Calendar Events (`/api/v1/calendar-events`)
+### 3.3 Direct Online Groups (`/api/v1/direct-online-groups`)
+
+Manages online fellowship recovery groups with virtual meeting links (Zoom, Google Meet, MS Teams).
+
+#### `GET /api/v1/direct-online-groups`
+- **Access:** Public
+- **Query Params:** `per_page` (integer, default 15, max 100), `page` (integer)
+- **Response (200 OK):** Paginated collection of direct online groups with loaded relations (`user`, `meetings`).
+
+#### `GET /api/v1/direct-online-groups/{id}`
+- **Access:** Public
+- **Response (200 OK):** Single `DirectOnlineGroupResource`.
+
+#### `POST /api/v1/direct-online-groups` *(Auth Required)*
+- **Body Schema:**
+  ```json
+  {
+    "ar_name": "مجموعة الأمل أونلاين",
+    "en_name": "Hope Online Group",
+    "ar_gsr_name": "أحمد",
+    "en_gsr_name": "Ahmed",
+    "phone": "+201011122233",
+    "location": "https://zoom.us/j/123456789"
+  }
+  ```
+- **Response (201 Created)**
+
+#### `PUT /api/v1/direct-online-groups/{id}` *(Auth Required)*
+- **Response (200 OK)**
+
+#### `DELETE /api/v1/direct-online-groups/{id}` *(Auth Required)*
+- **Response (204 No Content)**
+
+---
+
+### 3.4 Calendar Events (`/api/v1/calendar-events`)
 
 #### `GET /api/v1/calendar-events`
 - **Access:** Public
 - **Query Params:**
   - `start`: ISO-8601 date string (e.g. `2026-08-01`)
   - `end`: ISO-8601 date string (e.g. `2026-08-31`)
-  *(When both `start` and `end` are passed, recurring occurrences are automatically expanded into discrete instances)*
-- **Response (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "id": 1,
-        "title": "Regional Committee Meeting",
-        "start": "2026-09-01T10:00:00.000000Z",
-        "end": "2026-09-01T14:00:00.000000Z",
-        "description": "Monthly regional service committee meeting.",
-        "user_id": 1,
-        "color": "#00698f",
-        "organizer": "Cairo Area",
-        "location": "Community Hall, Cairo",
-        "recurrence": ["monthly", "1st"],
-        "formatted_recurrence": "First Tuesday",
-        "is_featured": true,
-        "created_at": "2026-08-20T00:00:00.000000Z",
-        "updated_at": "2026-08-20T00:00:00.000000Z"
-      }
-    ]
-  }
-  ```
+- **Response (200 OK)**
 
 #### `GET /api/v1/calendar-events/{id}`
-Returns a single calendar event object.
+- **Response (200 OK)**
 
 #### `POST /api/v1/calendar-events` *(Auth Required)*
-- **Body Schema:**
-  ```json
-  {
-    "title": "Regional Committee Meeting",
-    "start": "2026-09-01 10:00:00",
-    "end": "2026-09-01 14:00:00",
-    "description": "Monthly regional service committee meeting.",
-    "color": "#00698f",
-    "organizer": "Cairo Area",
-    "location": "Community Hall, Cairo",
-    "recurrence": ["monthly", "1st"],
-    "is_featured": true
-  }
-  ```
 - **Response (201 Created):** Single `CalendarEventResource` object.
 
 #### `PUT /api/v1/calendar-events/{id}` *(Auth Required)*
-- **Response (200 OK):** Updated `CalendarEventResource` object.
+- **Response (200 OK)**
 
 #### `DELETE /api/v1/calendar-events/{id}` *(Auth Required)*
-- **Response (200 OK):** `{"message": "Deleted successfully"}`
-
----
-
-### 3.4 Announcements & Events (`/api/v1/events`)
-
-#### `GET /api/v1/events`
-- **Access:** Public
-- **Response (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "id": 1,
-        "name": "Unity Convention",
-        "description": "Annual convention gathering",
-        "date": "2026-10-15",
-        "service_body_id": 1,
-        "service_body": {
-          "id": 1,
-          "ar_name": "لجنة مصر",
-          "en_name": "Egypt RSC"
-        },
-        "day_id": 1,
-        "day": {
-          "id": 1,
-          "ar_name": "السبت",
-          "en_name": "Saturday"
-        },
-        "created_at": "2026-08-20T00:00:00.000000Z",
-        "updated_at": "2026-08-20T00:00:00.000000Z"
-      }
-    ]
-  }
-  ```
-
-#### `GET /api/v1/events/{id}`
-Returns a single event object with loaded relations (`day`, `servicebody`).
-
-#### `POST /api/v1/events` *(Auth Required)*
-- **Body Schema:**
-  ```json
-  {
-    "name": "Unity Convention",
-    "description": "Annual convention gathering",
-    "date": "2026-10-15",
-    "service_body_id": 1,
-    "day_id": 1
-  }
-  ```
-- **Response (201 Created):** Single `EventResource` object.
-
-#### `PUT /api/v1/events/{id}` *(Auth Required)*
-- **Response (200 OK):** Updated `EventResource` object.
-
-#### `DELETE /api/v1/events/{id}` *(Auth Required)*
 - **Response (204 No Content)**
 
 ---
 
-### 3.5 Group Agendas (`/api/v1/agendas`)
+### 3.5 Announcements & Events (`/api/v1/events`)
 
-#### `GET /api/v1/agendas`
-Returns all group agenda submissions.
+- `GET /api/v1/events`: List announcements & events.
+- `GET /api/v1/events/{id}`: Single event details.
+- `POST /api/v1/events`: Create event (Returns `201 Created`).
+- `PUT /api/v1/events/{id}`: Update event (Returns `200 OK`).
+- `DELETE /api/v1/events/{id}`: Delete event (Returns `204 No Content`).
 
-#### `POST /api/v1/agendas` *(Auth Required)*
+---
+
+### 3.6 Group Agendas (`/api/v1/agendas`)
+
+- `GET /api/v1/agendas`: List group agenda submissions.
+- `GET /api/v1/agendas/{id}`: Single agenda details.
+- `POST /api/v1/agendas`: Submit group agenda report (Returns `201 Created`).
+- `PUT /api/v1/agendas/{id}`: Update agenda (Returns `200 OK`).
+- `DELETE /api/v1/agendas/{id}`: Delete agenda (Returns `204 No Content`).
+
+---
+
+### 3.7 Service Committee Workgroups (`/api/v1/workgroups`)
+
+Manages sub-entities (workgroups) belonging to parent service committees (`parent_id != null`).
+
+- **Scoping & Authorization:**
+  - Public can read all active workgroups (`GET /api/v1/workgroups`, `GET /api/v1/workgroups/{id}`).
+  - Non-superadmins with role `Committees` can only create/update/delete workgroups under their owned committee.
+  - Officers with role `rsc` are strictly scoped to workgroups under Committee `83` (Regional Service Committee).
+  - Workgroup users can only view and edit their own assigned workgroup details.
+
+#### `GET /api/v1/workgroups`
+- **Query Params:** `parent_id`, `status` (`active`/`inactive`), `per_page`
+- **Response (200 OK):** Paginated `WorkgroupResource` collection with loaded `parent`, `user`, and `meetings`.
+
+#### `POST /api/v1/workgroups` *(Auth Required)*
 - **Body Schema:**
   ```json
   {
-    "group_id": 1,
-    "meetings_per_week": 4,
-    "agenda_date": "2026-08-01",
-    "service_position": "GSR",
-    "submitter_name": "John Doe",
-    "alt_gsr_position": "Alt. GSR",
-    "alt_gsr_name": "Jane Smith",
-    "new_comers": 5,
-    "open_positions": "Treasurer, Secretary",
-    "next_business_meeting": "2026-09-05",
-    "recovery_meetings_changes": false,
-    "recovery_atmosphere": "Strong and welcoming",
-    "trusted_servants": "All positions active",
-    "financial_issues": "Prudent reserve met",
-    "other_topics": [
-      { "title": "Literature Stock", "content": "Need more basic texts" }
-    ]
+    "parent_id": 1,
+    "workgroup_type": "standing",
+    "status": "active",
+    "ar_name": "مجموعة عمل السوشيال ميديا",
+    "en_name": "Social Media Workgroup",
+    "chairman_name": "محمد",
+    "chairman_phone": "+201009988776"
   }
   ```
-- **Response (201 Created):** Single `AgendaResource` object.
+- **Response (201 Created)**
 
-#### `GET /api/v1/agendas/{id}`
-Returns single agenda item.
+#### `PUT /api/v1/workgroups/{id}` *(Auth Required)*
+- **Response (200 OK)**
 
-#### `PUT /api/v1/agendas/{id}` *(Auth Required)*
-Updates agenda submission.
-
-#### `DELETE /api/v1/agendas/{id}` *(Auth Required)*
+#### `DELETE /api/v1/workgroups/{id}` *(Auth Required)*
 - **Response (204 No Content)**
 
 ---
 
-### 3.6 Lookups & Directory Resources (Public Read)
+### 3.8 Lookups & Directory Resources (Public Read)
 
 | Resource Endpoint | GET (Public) | POST/PUT/DELETE (Auth) | Description & Key Attributes |
 | :--- | :--- | :--- | :--- |
-| `/api/v1/cities` | List / Detail | Full CRUD (`201 Created`) | Cities directory (`ar_name`, `en_name`, `latitude`, `longitude`) |
-| `/api/v1/neighborhoods` | List / Detail | Full CRUD (`201 Created`) | Neighborhoods (`ar_name`, `en_name`, `city_id`, `latitude`, `longitude`) |
-| `/api/v1/days` | List / Detail | Full CRUD (`201 Created`) | Week days lookup (`ar_name`, `en_name`) |
-| `/api/v1/topics` | List / Detail | Full CRUD (`201 Created`) | Meeting topics (`ar_name`, `en_name`) |
-| `/api/v1/options` | List / Detail | Full CRUD (`201 Created`) | Meeting options (`ar_name`, `en_name`) |
-| `/api/v1/sc-meetings` | List / Detail | Full CRUD (`201 Created`) | Service Committee schedule meetings (`service_committee_id`, `week_number`, `day_id`, `time`, `notes`) |
-| `/api/v1/service-bodies` | List / Detail | Full CRUD (`201 Created`) | Areas / Service bodies (`ar_name`, `en_name`, `day_id`, `start_time`, `end_time`, `location`) |
-| `/api/v1/service-committees` | List / Detail | Full CRUD (`201 Created`) | Subcommittees (`ar_name`, `en_name`, `ar_address`, `en_address`, `location`) |
+| `/api/v1/cities` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Cities directory (`ar_name`, `en_name`, `latitude`, `longitude`) |
+| `/api/v1/neighborhoods` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Neighborhoods (`ar_name`, `en_name`, `city_id`, `latitude`, `longitude`) |
+| `/api/v1/days` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Week days lookup (`ar_name`, `en_name`) |
+| `/api/v1/topics` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Meeting topics (`ar_name`, `en_name`) |
+| `/api/v1/options` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Meeting options (`ar_name`, `en_name`) |
+| `/api/v1/sc-meetings` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Service Committee schedule meetings (`service_committee_id`, `week_number`, `day_id`, `time`, `notes`) |
+| `/api/v1/service-bodies` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Areas / Service bodies (`ar_name`, `en_name`, `day_id`, `start_time`, `end_time`, `location`) |
+| `/api/v1/service-committees` | List / Detail | Full CRUD (`201 Created`, `204 No Content`) | Subcommittees (`ar_name`, `en_name`, `ar_address`, `en_address`, `location`) |
 
 ---
 
@@ -480,88 +331,271 @@ Updates agenda submission.
 ---
 
 ### 4.1 Service Body Agendas (`/api/v1/service-body-agendas`)
-
-Manages area/regional monthly agenda reports and voting topics. Filtered by role (`super admin`, `rsc`, `ServiceBody`).
-
 - `GET /api/v1/service-body-agendas`: List available agendas with permission rules applied.
-- `POST /api/v1/service-body-agendas`: Create monthly service body agenda (Returns `201 Created`).
+- `POST /api/v1/service-body-agendas`: Create monthly agenda (Returns `201 Created`).
 - `GET /api/v1/service-body-agendas/{id}`: Single agenda with questions & answers.
 - `PUT /api/v1/service-body-agendas/{id}`: Update agenda data.
 - `DELETE /api/v1/service-body-agendas/{id}`: Delete agenda record (`204 No Content`).
 
 ---
 
-### 4.2 Contact Requests (`/api/v1/contact-requests` & `/api/v1/contact-us`)
+### 4.2 IT & Data Change Requests (`/api/v1/change-requests`)
 
-- `GET /api/v1/contact-requests` / `GET /api/v1/contact-us`: Retrieve member/public contact submissions.
-- `POST /api/v1/contact-us`: (Returns `201 Created`)
+Allows trusted servants and members to submit change requests for meetings, groups, and committee information with file attachments.
+
+#### `GET /api/v1/change-requests`
+- **Access:** Authenticated. Regular users view their own requests; super admins view all requests across the fellowship.
+- **Query Params:** `status` (`pending`, `in_progress`, `completed`, `rejected`), `per_page`
+- **Response (200 OK):** Paginated `ChangeRequestResource` list.
+
+#### `POST /api/v1/change-requests`
+- **Content-Type:** `multipart/form-data`
+- **Form Fields:**
+  - `request_type`: `required|string|in:meetings_groups,committee_info,general,other`
+  - `subject`: `required|string|max:255`
+  - `description`: `required|string`
+  - `attachment`: `nullable|file|mimes:pdf,png,jpg,jpeg,docx,xlsx|max:5120` (up to 5MB)
+- **Response (201 Created):** Single `ChangeRequestResource`.
+
+#### `GET /api/v1/change-requests/{id}`
+- **Response (200 OK)**
+
+#### `PATCH /api/v1/change-requests/{id}/status` *(Super Admin Only)*
+- **Body Schema:**
   ```json
   {
-    "name": "Member Name",
-    "email": "member@example.com",
-    "message": "Inquiry regarding area helpline..."
+    "status": "in_progress"
   }
   ```
+- **Response (200 OK)**
+
+#### `DELETE /api/v1/change-requests/{id}`
+Deletes request and any associated file attachment. Allowed for owner (if `pending`) or super admin.
+- **Response (204 No Content)**
+
+---
+
+### 4.3 Custom Forms & Public Submissions (`/api/v1/forms`)
+
+#### Public Form Endpoints (Unauthenticated):
+- `GET /api/v1/forms/public/{slug}`: Retrieves public form definition and active fields. Increments form views counter. Returns `404` if unpublished/archived.
+- `POST /api/v1/forms/public/{slug}/submit`: Submits response data for an active form.
+  - **Body Schema:** Pass field values using `field_{id}`:
+    ```json
+    {
+      "field_1": "أحمد علي",
+      "field_2": "ahmed@example.com",
+      "field_3": "yes"
+    }
+    ```
+  - **Response (201 Created):**
+    ```json
+    {
+      "data": {
+        "id": 10,
+        "custom_form_id": 2,
+        "user_id": null,
+        "responses": {
+          "1": "أحمد علي",
+          "2": "ahmed@example.com"
+        },
+        "created_at": "2026-09-13T03:00:00.000000Z"
+      }
+    }
+    ```
+
+#### Form Management Endpoints (`auth:sanctum`):
+- `GET /api/v1/forms`: List user's forms (or all forms if super admin).
+- `POST /api/v1/forms`: Create custom form with embedded fields (Returns `201 Created`).
+- `GET /api/v1/forms/{id}`: Single form details with fields and submission count.
+- `PUT /api/v1/forms/{id}`: Update form properties.
+- `DELETE /api/v1/forms/{id}`: Delete form and cascaded fields/submissions (`204 No Content`).
+- `GET /api/v1/forms/{id}/submissions`: Paginated list of submissions for the specified form.
+
+---
+
+### 4.4 Helpline Calls & Volunteer Logging (`/api/v1/helpline-calls`)
+
+Provides schema discovery, public call response logging, and authenticated administrative listing for the fellowship helpline service.
+
+#### `GET /api/v1/helpline-calls/schema`
+- **Access:** Public
+- **Description:** Returns the dynamic form schema, including localized field order, duration options, active shifts (incorporating the `8:00 PM - 10:00 PM` shift), caller types, referral sources, and active volunteer directory.
+- **Response (200 OK):**
+  ```json
+  {
+    "title": "Helpline Call Response Form",
+    "locale": "ar",
+    "shifts": [
+      "10:00 AM - 12:00 PM",
+      "12:00 PM - 2:00 PM",
+      "2:00 PM - 4:00 PM",
+      "4:00 PM - 6:00 PM",
+      "6:00 PM - 8:00 PM",
+      "8:00 PM - 10:00 PM",
+      "10:00 PM - 12:00 AM"
+    ],
+    "caller_types": [
+      "أعضاء محتملة",
+      "عضو محتمل منعزل",
+      "بيانات اجتماعات",
+      "عضو حالي",
+      "معلومات عن الزمالة",
+      "أهالي وأقارب المدمنين",
+      "عضو حالي منعزل",
+      "معلومات عن زمالات أخرى",
+      "مكالمة بالخطأ",
+      "محولة للجنة العلاقات العامة",
+      "أخرى"
+    ],
+    "referral_sources": [
+      "جدول الاجتماعات",
+      "صديق",
+      "الموقع الالكتروني",
+      "ملصقات الزمالة",
+      "عضو حالي",
+      "بحث جوجل",
+      "طبيب",
+      "مكان علاجي",
+      "لجنة المستشفيات",
+      "صانع محتوى",
+      "Yellow Pages",
+      "Facebook",
+      "TikTok",
+      "Instagram",
+      "أخرى"
+    ],
+    "durations": [
+      { "value": "less_than_5", "label": "أقل من 5 دقائق" },
+      { "value": "more_than_5", "label": "أكثر من 5 دقائق" }
+    ],
+    "volunteers": [
+      { "id": 1, "name": "محمد م.", "sort_order": 1 }
+    ],
+    "fields_order": [
+      "duration",
+      "call_date",
+      "call_time_shift",
+      "caller_type",
+      "referral_source",
+      "volunteer_name",
+      "is_step_12",
+      "call_brief",
+      "discuss_in_meeting",
+      "additional_info"
+    ]
+  }
+  ```
+
+#### `POST /api/v1/helpline-calls`
+- **Access:** Public
+- **Headers:** `Content-Type: application/json`, `Accept: application/json`
+- **Body Schema:**
+  - `duration`: `required|in:less_than_5,more_than_5`
+  - `call_date`: `required|date` (Format `YYYY-MM-DD`)
+  - `call_time_shift`: `required|string|max:100` (e.g., `"8:00 PM - 10:00 PM"`)
+  - `caller_type`: `required|string|max:100`
+  - `caller_type_other`: `nullable|string|max:255` (*Required with `422` validation failure if `caller_type === 'أخرى'`*)
+  - `referral_source`: `required|string|max:100`
+  - `referral_source_other`: `nullable|string|max:255` (*Required with `422` validation failure if `referral_source === 'أخرى'`*)
+  - `volunteer_name`: `required|string|max:150`
+  - `volunteer_name_other`: `nullable|string|max:150` (*Required with `422` validation failure if `volunteer_name === 'أخرى'`*)
+  - `is_step_12`: `required|boolean`
+  - `call_brief`: `required|string|min:3`
+  - `discuss_in_meeting`: `required|boolean`
+  - `additional_info`: `nullable|string`
+- **Behavior:**
+  - Automatically associates `volunteer_id` if `volunteer_name` matches an active `HelplineVolunteer` record.
+  - Automatically records `entry_time` with the current timestamp.
+- **Example Payload:**
+  ```json
+  {
+    "duration": "more_than_5",
+    "call_date": "2026-09-17",
+    "call_time_shift": "8:00 PM - 10:00 PM",
+    "caller_type": "عضو حالي",
+    "referral_source": "جدول الاجتماعات",
+    "volunteer_name": "محمد م.",
+    "is_step_12": true,
+    "call_brief": "طلب مساعدة هاتفية لخطوة 12 من عضو حالي.",
+    "discuss_in_meeting": false,
+    "additional_info": "تمت إحالته لأقرب اجتماع حضوري."
+  }
+  ```
+- **Response (201 Created):**
+  ```json
+  {
+    "data": {
+      "id": 1,
+      "duration": "more_than_5",
+      "duration_label": "أكثر من 5 دقائق",
+      "call_date": "2026-09-17",
+      "call_time_shift": "8:00 PM - 10:00 PM",
+      "caller_type": "عضو حالي",
+      "caller_type_other": null,
+      "effective_caller_type": "عضو حالي",
+      "referral_source": "جدول الاجتماعات",
+      "referral_source_other": null,
+      "effective_referral_source": "جدول الاجتماعات",
+      "volunteer_id": 1,
+      "volunteer_name": "محمد م.",
+      "volunteer_name_other": null,
+      "effective_volunteer_name": "محمد م.",
+      "is_step_12": true,
+      "call_brief": "طلب مساعدة هاتفية لخطوة 12 من عضو حالي.",
+      "discuss_in_meeting": false,
+      "additional_info": "تمت إحالته لأقرب اجتماع حضوري.",
+      "entry_time": "2026-09-17T12:00:00.000000Z",
+      "created_at": "2026-09-17T12:00:00.000000Z"
+    }
+  }
+  ```
+
+#### `GET /api/v1/helpline-calls`
+- **Access:** Authenticated (`Authorization: Bearer <sanctum_token>`)
+- **Query Parameters:**
+  - `start_date` *(optional)*: Filter calls recorded on or after `YYYY-MM-DD` (`entry_time >= start_date`)
+  - `end_date` *(optional)*: Filter calls recorded on or before `YYYY-MM-DD` (`entry_time <= end_date`)
+  - `page` *(optional)*: Page number for pagination (25 records per page)
+- **Response (200 OK):** Paginated `HelplineCallResource` collection (`data`, `links`, `meta`).
+
+---
+
+### 4.5 Contact Requests (`/api/v1/contact-requests` & `/api/v1/contact-us`)
+- `GET /api/v1/contact-requests` / `GET /api/v1/contact-us`: Retrieve member/public contact submissions.
+- `POST /api/v1/contact-us`: Create contact request (Returns `201 Created`).
 - `GET /api/v1/contact-us/{id}`
 - `PUT /api/v1/contact-us/{id}`
 - `DELETE /api/v1/contact-us/{id}` (`204 No Content`)
 
 ---
 
-### 4.3 Audit & Financial Transactions (`/api/v1/transactions`)
-
+### 4.6 Audit Transactions (`/api/v1/transactions`)
 - `GET /api/v1/transactions`: Audit ledger recording system and model actions.
 - `POST /api/v1/transactions`: Record audit transaction (Returns `201 Created`).
-  ```json
-  {
-    "model": "Group",
-    "operation": "create",
-    "details": { "name": "Hope Group", "city": "Cairo" },
-    "old_values": null,
-    "new_values": { "id": 1, "name": "Hope Group" }
-  }
-  ```
 - `GET /api/v1/transactions/{id}`
 - `PUT /api/v1/transactions/{id}`
 - `DELETE /api/v1/transactions/{id}` (`204 No Content`)
 
 ---
 
-### 4.4 Committee Reports (`/api/v1/committee-reports`)
-
+### 4.7 Committee Reports (`/api/v1/committee-reports`)
 - `GET /api/v1/committee-reports`: List sub-committee periodic reports.
 - `POST /api/v1/committee-reports`: Upload/publish sub-committee report (Returns `201 Created`).
-  ```json
-  {
-    "service_committee_id": 1,
-    "meeting_date": "2026-09-01",
-    "report_date": "2026-09-01",
-    "body": "Report summary content",
-    "status": "approved"
-  }
-  ```
 - `GET /api/v1/committee-reports/{id}`
 - `PUT /api/v1/committee-reports/{id}`
 - `DELETE /api/v1/committee-reports/{id}` (`204 No Content`)
 
 ---
 
-### 4.5 Newsletter & Subscribers
-
+### 4.8 Newsletter & Subscribers
 - `GET /api/v1/newsletter-members` *(Auth)*: Newsletter recipient directory.
-- `POST /api/v1/newsletter-members` *(Auth)*: (Returns `201 Created`)
-  ```json
-  {
-    "email": "user@example.com",
-    "subscribe": true
-  }
-  ```
+- `POST /api/v1/newsletter-members` *(Auth)*: Add subscriber (Returns `201 Created`).
 - `DELETE /api/v1/newsletter-members/{id}` (`204 No Content`)
 
 ---
 
-### 4.6 User & Role Management
-
+### 4.9 User & Role Management
 - `GET /api/v1/users`: List users (Super admin / RSC).
 - `POST /api/v1/users`: Create user account (Returns `201 Created`).
 - `GET /api/v1/users/{id}`: User profile.
@@ -572,19 +606,46 @@ Manages area/regional monthly agenda reports and voting topics. Filtered by role
 
 ---
 
-## 5. Universal API Client Integration Snippet (Generic REST Pattern)
+## 5. Universal API Client Integration Snippet (TypeScript)
 
-### Example cURL Request with Auth:
-```bash
-curl -X GET "https://naegypt.org/api/v1/meetings?city=Cairo&day=Friday" \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer 1|your_sanctum_token_here"
-```
-
-### TypeScript / JavaScript Request Helper Example:
 ```typescript
 interface ApiResponse<T> {
   data: T;
+  links?: Record<string, any>;
+  meta?: Record<string, any>;
+}
+
+export interface HelplineVolunteerItem {
+  id: number;
+  name: string;
+  sort_order?: number;
+}
+
+export interface HelplineSchemaResponse {
+  title: string;
+  locale: string;
+  shifts: string[];
+  caller_types: string[];
+  referral_sources: string[];
+  durations: Array<{ value: string; label: string }>;
+  volunteers: HelplineVolunteerItem[];
+  fields_order: string[];
+}
+
+export interface HelplineCallPayload {
+  duration: "less_than_5" | "more_than_5";
+  call_date: string; // YYYY-MM-DD
+  call_time_shift: string;
+  caller_type: string;
+  caller_type_other?: string | null;
+  referral_source: string;
+  referral_source_other?: string | null;
+  volunteer_name: string;
+  volunteer_name_other?: string | null;
+  is_step_12: boolean;
+  call_brief: string;
+  discuss_in_meeting: boolean;
+  additional_info?: string | null;
 }
 
 export class NaEgyptApiClient {
@@ -602,7 +663,7 @@ export class NaEgyptApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       "Accept": "application/json",
-      "Content-Type": "application/json",
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(this.token ? { "Authorization": `Bearer ${this.token}` } : {}),
       ...(options.headers as Record<string, string> || {}),
     };
@@ -634,27 +695,47 @@ export class NaEgyptApiClient {
     return res;
   }
 
-  // Fetch Frontpage Consolidated Data
+  // Logout (Token Revocation)
+  public async logout() {
+    await this.request<void>("/auth/logout", { method: "POST" });
+    this.setToken(null);
+  }
+
+  // Fetch Frontpage Data
   public async getHomeData(date?: string) {
     const query = date ? `?date=${encodeURIComponent(date)}` : "";
     return this.request<ApiResponse<any>>(`/home${query}`);
   }
 
-  // Fetch Just For Today Daily Reading
-  public async getJft(date?: string) {
-    const query = date ? `?date=${encodeURIComponent(date)}` : "";
-    return this.request<ApiResponse<any>>(`/jft${query}`);
+  // Submit Public Form
+  public async submitPublicForm(slug: string, payload: Record<string, any>) {
+    return this.request<ApiResponse<any>>(`/forms/public/${slug}/submit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   }
 
-  // Fetch Public Stats
-  public async getStats() {
-    return this.request<ApiResponse<any>>("/stats");
+  // Get Helpline Form Schema & Active Volunteers
+  public async getHelplineSchema(): Promise<HelplineSchemaResponse> {
+    return this.request<HelplineSchemaResponse>("/helpline-calls/schema");
   }
 
-  // Fetch Meetings
-  public async getMeetings(params?: Record<string, string>) {
-    const queryString = params ? "?" + new URLSearchParams(params).toString() : "";
-    return this.request<ApiResponse<any[]>>(`/meetings${queryString}`);
+  // Submit Helpline Call Response Log
+  public async submitHelplineCall(payload: HelplineCallPayload) {
+    return this.request<ApiResponse<any>>("/helpline-calls", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Get Helpline Calls (Authenticated with Optional Date Filtering)
+  public async getHelplineCalls(params?: { start_date?: string; end_date?: string; page?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.start_date) searchParams.append("start_date", params.start_date);
+    if (params?.end_date) searchParams.append("end_date", params.end_date);
+    if (params?.page) searchParams.append("page", params.page.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    return this.request<ApiResponse<any[]>>(`/helpline-calls${query}`);
   }
 }
 ```
@@ -663,8 +744,8 @@ export class NaEgyptApiClient {
 
 ## 6. Automated QA & Testing Reference
 
-Run the comprehensive PHPUnit automated test suite across all 25 endpoints:
+Run the comprehensive PHPUnit automated test suite across all 13 API feature test suites:
 ```bash
 php vendor/bin/phpunit tests/Feature/Api/
 ```
-All feature test suites (`AuthApiTest`, `CompositeApiTest`, `MeetingApiTest`, `DirectoryApiTest`, `AgendaApiTest`, `ProtectedManagementApiTest`, `CalendarEventApiTest`, `EventApiTest`) validate status codes (200/201/204/401/403/422), JSON payloads, filtering, and authorization barriers with 100% test passing.
+All feature test suites (`AgendaApiTest`, `AuthApiTest`, `CalendarEventApiTest`, `ChangeRequestApiTest`, `CompositeApiTest`, `CustomFormApiTest`, `DirectOnlineGroupApiTest`, `DirectoryApiTest`, `EventApiTest`, `HelplineCallApiTest`, `MeetingApiTest`, `ProtectedManagementApiTest`, `WorkgroupApiTest`) validate status codes (200/201/204/401/403/422), mass-assignment validation guards, JSON payloads, filtering, file uploads, conditional validation rules, and authorization barriers with 100% test passing (84 tests, 493 assertions).
