@@ -12,3 +12,4 @@ export * from './contact';
 export * from './transactions';
 export * from './newsletter';
 export * from './users';
+export * from './helpline';

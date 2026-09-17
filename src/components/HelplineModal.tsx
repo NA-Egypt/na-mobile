@@ -30,6 +30,7 @@ import { apiClient } from '../api/client';
 import { HelplineItem, SocialLinks } from '../api/types';
 import { useAppTheme } from '../theme';
 import { AppText, Badge, AppButton } from './ui';
+import { HelplineCallLoggerModal } from './HelplineCallLoggerModal';
 import { haptic } from '../utils/haptics';
 
 interface HelplineModalProps {
@@ -81,6 +82,30 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
   const [socialLinks, setSocialLinks] = useState<SocialLinks | null>(OFFICIAL_DEFAULT_SOCIAL);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Hidden 5-tap gesture to reveal Helpline Call Logger
+  const [isCallLoggerVisible, setIsCallLoggerVisible] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const lastTapTimeRef = React.useRef<number>(0);
+
+  const handleHeaderTap = () => {
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 2500) {
+      const nextCount = tapCount + 1;
+      if (nextCount >= 5) {
+        haptic.success();
+        setTapCount(0);
+        setIsCallLoggerVisible(true);
+      } else {
+        haptic.light();
+        setTapCount(nextCount);
+      }
+    } else {
+      haptic.light();
+      setTapCount(1);
+    }
+    lastTapTimeRef.current = now;
+  };
 
   const fetchHelplines = async () => {
     setIsLoading(true);
@@ -169,11 +194,18 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bgPrimary }]} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.cardBorder, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-          <View style={[styles.headerTitleRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+          <TouchableOpacity
+            style={[styles.headerTitleRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}
+            onPress={handleHeaderTap}
+            activeOpacity={0.85}
+            accessibilityRole="header"
+            accessibilityLabel={isAr ? 'خطوط المساعدة والتواصل' : 'Helplines & Official Channels'}
+          >
             <View style={[styles.iconCircle, { backgroundColor: colors.accentLight, marginEnd: isAr ? 0 : 10, marginStart: isAr ? 10 : 0 }]}>
               <PhoneCall size={18} color={colors.accentDark} />
             </View>
@@ -185,7 +217,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
                 {isAr ? 'نحن متواجدون لمساعدتك ومساعدة من تحب' : 'We are here to help you and your loved ones'}
               </AppText>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => {
@@ -415,6 +447,11 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
         </ScrollView>
       </SafeAreaView>
     </Modal>
+    <HelplineCallLoggerModal
+      visible={isCallLoggerVisible}
+      onClose={() => setIsCallLoggerVisible(false)}
+    />
+  </>
   );
 };
 

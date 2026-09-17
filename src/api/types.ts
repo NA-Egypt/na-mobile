@@ -268,6 +268,9 @@ export interface GroupAgenda {
   financial_issues?: string;
   other_topics?: AgendaTopic[];
   group?: Group;
+  entity_name?: string;
+  group_name?: string;
+  service_body_name?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -521,5 +524,68 @@ export interface CreateScMeetingPayload {
   end_time: string;
   location?: string;
   notes?: string;
+}
+
+// Helpline Calls & Volunteer Logging (/api/v1/helpline-calls)
+export interface HelplineVolunteerItem {
+  id: number;
+  name: string;
+  sort_order?: number;
+}
+
+export interface HelplineDurationOption {
+  value: string;
+  label: string;
+}
+
+export interface HelplineSchemaResponse {
+  title: string;
+  locale: string;
+  shifts: string[];
+  caller_types: string[];
+  referral_sources: string[];
+  durations: HelplineDurationOption[];
+  volunteers: HelplineVolunteerItem[];
+  fields_order?: string[];
+}
+
+export interface HelplineCallPayload {
+  duration: 'less_than_5' | 'more_than_5' | string;
+  call_date: string; // YYYY-MM-DD
+  call_time_shift: string;
+  caller_type: string;
+  caller_type_other?: string | null;
+  referral_source: string;
+  referral_source_other?: string | null;
+  volunteer_name: string;
+  volunteer_name_other?: string | null;
+  is_step_12: boolean;
+  call_brief: string;
+  discuss_in_meeting: boolean;
+  additional_info?: string | null;
+}
+
+export interface HelplineCallResponse {
+  id: number;
+  duration: string;
+  duration_label?: string;
+  call_date: string;
+  call_time_shift: string;
+  caller_type: string;
+  caller_type_other?: string | null;
+  effective_caller_type?: string;
+  referral_source: string;
+  referral_source_other?: string | null;
+  effective_referral_source?: string;
+  volunteer_id?: number | null;
+  volunteer_name: string;
+  volunteer_name_other?: string | null;
+  effective_volunteer_name?: string;
+  is_step_12: boolean;
+  call_brief: string;
+  discuss_in_meeting: boolean;
+  additional_info?: string | null;
+  entry_time?: string;
+  created_at?: string;
 }
 

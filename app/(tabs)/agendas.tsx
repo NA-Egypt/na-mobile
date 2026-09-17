@@ -39,11 +39,17 @@ import {
   HelpCircle,
   MessageSquare,
   WifiOff,
+  Plus,
+  Shield,
 } from 'lucide-react-native';
 import { UserProfile } from '../../src/api/auth';
 import { apiClient } from '../../src/api/client';
 import { agendasApi } from '../../src/api/agendas';
 import { reportsApi } from '../../src/api/reports';
+import { groupsApi } from '../../src/api/groups';
+import { lookupsApi } from '../../src/api/lookups';
+import { Group, ServiceBody } from '../../src/api/types';
+import { SubmitAgendaModal } from '../../src/components/SubmitAgendaModal';
 import { azureAuthService } from '../../src/services/azureAuthService';
 import { useAppTheme } from '../../src/theme';
 import {
@@ -96,6 +102,11 @@ export default function AgendasScreen() {
     committees_archive: false,
   });
 
+  const [allGroups, setAllGroups] = useState<Group[]>([]);
+  const [groupsMap, setGroupsMap] = useState<Record<number, Group>>({});
+  const [serviceBodiesMap, setServiceBodiesMap] = useState<Record<number, ServiceBody>>({});
+  const [isSubmitModalVisible, setIsSubmitModalVisible] = useState<boolean>(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOfflineError, setIsOfflineError] = useState(false);
@@ -137,11 +148,36 @@ export default function AgendasScreen() {
     setTabForbidden({ groups: false, service_bodies: false, committees_archive: false });
 
     try {
-      const [agendasRes, sbRes, reportsRes] = await Promise.allSettled([
+      const [agendasRes, sbRes, reportsRes, groupsRes, sbListRes] = await Promise.allSettled([
         apiClient.get('/agendas', { params: { per_page: 100 } }),
         apiClient.get('/service-body-agendas', { params: { per_page: 100 } }),
         apiClient.get('/committee-reports', { params: { per_page: 100 } }),
+        groupsApi.getGroups({ per_page: 100 }),
+        lookupsApi.getServiceBodies(),
       ]);
+
+      if (groupsRes.status === 'fulfilled') {
+        const gList = groupsRes.value;
+        if (Array.isArray(gList)) {
+          setAllGroups(gList);
+          const gMap: Record<number, Group> = {};
+          gList.forEach((g) => {
+            if (g.id) gMap[g.id] = g;
+          });
+          setGroupsMap(gMap);
+        }
+      }
+
+      if (sbListRes.status === 'fulfilled') {
+        const sbList = sbListRes.value;
+        if (Array.isArray(sbList)) {
+          const sMap: Record<number, ServiceBody> = {};
+          sbList.forEach((sb) => {
+            if (sb.id) sMap[sb.id] = sb;
+          });
+          setServiceBodiesMap(sMap);
+        }
+      }
 
       let hasNetworkFailure = false;
 
@@ -306,9 +342,20 @@ export default function AgendasScreen() {
     }
   };
 
+  const userRoles = Array.isArray(user?.roles)
+    ? user.roles.map((r: any) => (typeof r === 'string' ? r : r.name || '').toLowerCase())
+    : [];
+  const hasGsrRole = userRoles.some((r) => r.includes('gsr') || r.includes('group'));
+  const userAssociatedGroup = allGroups.find(
+    (g) => g.user?.id === user?.id || (g as any).user_id === user?.id
+  );
+  const isGroupUser = Boolean(hasGsrRole || userAssociatedGroup);
+
   const currentList = (
     activeTab === 'groups'
-      ? groupAgendas
+      ? (isGroupUser && userAssociatedGroup?.id
+          ? groupAgendas.filter((a) => a.group_id === userAssociatedGroup.id)
+          : groupAgendas)
       : activeTab === 'service_bodies'
         ? serviceBodyAgendas
         : committeeReports
@@ -667,6 +714,68 @@ export default function AgendasScreen() {
                 tintColor={colors.accent}
               />
             }
+            ListHeaderComponent={
+              activeTab === 'groups' && user ? (
+                isGroupUser ? (
+                  <View
+                    style={[
+                      styles.actionHeaderBar,
+                      shadows.card,
+                      {
+                        backgroundColor: colors.cardBg,
+                        borderColor: colors.cardBorder,
+                        borderRadius: borderRadius.lg,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="caption" color={colors.textSecondary}>
+                        {isAr ? 'أجندات مجموعتك المسجلة' : 'Your Group Agendas'}
+                      </AppText>
+                      <AppText variant="h4" color={colors.textPrimary} weight="700">
+                        {(isAr ? userAssociatedGroup?.ar_name : userAssociatedGroup?.en_name) ||
+                          userAssociatedGroup?.ar_name ||
+                          (isAr ? 'مجموعتي' : 'My Group')}
+                      </AppText>
+                    </View>
+                    <AppButton
+                      title={isAr ? 'تقديم أجندة جديدة' : 'Submit New Agenda'}
+                      onPress={() => {
+                        haptic.selection();
+                        setIsSubmitModalVisible(true);
+                      }}
+                      variant="primary"
+                      size="sm"
+                      icon={<Plus size={15} color="#ffffff" />}
+                    />
+                  </View>
+                ) : (
+                  <View
+                    style={[
+                      styles.nonGroupServantBanner,
+                      {
+                        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(2, 132, 199, 0.08)',
+                        borderColor: isDark ? '#38bdf8' : colors.primary,
+                        borderRadius: borderRadius.md,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                  >
+                    <Shield size={18} color={isDark ? '#38bdf8' : colors.primary} style={{ marginHorizontal: 6 }} />
+                    <AppText
+                      variant="caption"
+                      color={colors.textPrimary}
+                      style={{ flex: 1, lineHeight: 18, textAlign: isAr ? 'right' : 'left' }}
+                    >
+                      {isAr
+                        ? 'تقديم جداول الأعمال مخصص لخدام المجموعات (GSR). بصفتك خادماً مؤتمناً يمكنك استعراض تقارير اللجان وأجندات المنتديات من الأقسام أعلاه.'
+                        : 'Submitting group agendas is restricted to Group GSRs. As a trusted servant, you can explore Committee Reports and Service Body archives above.'}
+                    </AppText>
+                  </View>
+                )
+              ) : null
+            }
             renderItem={({ item }) => {
               if (!item || typeof item !== 'object') return null;
 
@@ -674,13 +783,18 @@ export default function AgendasScreen() {
                 const dateStr = item.agenda_date || item.created_at || '';
                 const submitter = item.submitter_name || (isAr ? 'خادم المجموعة' : 'GSR');
                 const position = item.service_position || (isAr ? 'خادم موثوق' : 'Trusted Servant');
-                const groupTitle =
-                  (isAr ? item.group?.ar_name : item.group?.en_name) ||
-                  item.group?.ar_name ||
-                  item.group?.en_name ||
-                  item.group_name ||
-                  item.title ||
-                  (isAr ? 'جدول أعمال مجموعة' : 'Group Business Agenda');
+
+                const groupObj = item.group || groupsMap[item.group_id];
+                const rawGroupName =
+                  (isAr ? groupObj?.ar_name : groupObj?.en_name) ||
+                  groupObj?.ar_name ||
+                  groupObj?.en_name ||
+                  item.group_name;
+                const groupTitle = rawGroupName
+                  ? (rawGroupName.includes('مجموعة') || !isAr ? rawGroupName : `مجموعة ${rawGroupName}`)
+                  : (isAr ? `مجموعة رقم #${item.group_id}` : `Group #${item.group_id}`);
+                const sbObj = groupObj?.service_body || (groupObj?.service_body_id ? serviceBodiesMap[groupObj.service_body_id] : null);
+                const areaName = (isAr ? sbObj?.ar_name : sbObj?.en_name) || sbObj?.ar_name || sbObj?.en_name;
 
                 return (
                   <View
@@ -696,6 +810,14 @@ export default function AgendasScreen() {
                   >
                     <View style={[styles.cardHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
                       <Badge label={position} variant="accent" size="sm" />
+                      {areaName ? (
+                        <Badge
+                          label={areaName}
+                          variant="neutral"
+                          size="sm"
+                          icon={<Building2 size={11} color={colors.textSecondary} />}
+                        />
+                      ) : null}
                       {dateStr ? (
                         <Badge
                           label={dateStr.slice(0, 10)}
@@ -716,6 +838,15 @@ export default function AgendasScreen() {
                         {isAr ? `مقدم التقرير: ${submitter}` : `Submitter: ${submitter}`}
                       </AppText>
                     </View>
+
+                    {areaName ? (
+                      <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <Building2 size={14} color={colors.primary} style={{ marginEnd: isAr ? 0 : 6, marginStart: isAr ? 6 : 0 }} />
+                        <AppText variant="bodySmall" color={colors.textSecondary} style={{ textAlign: isAr ? 'right' : 'left' }}>
+                          {isAr ? `المنطقة / المنتدى: ${areaName}` : `Area / GSF: ${areaName}`}
+                        </AppText>
+                      </View>
+                    ) : null}
 
                     {item.meetings_per_week ? (
                       <View style={[styles.infoRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
@@ -755,8 +886,14 @@ export default function AgendasScreen() {
                   </View>
                 );
               } else if (activeTab === 'service_bodies') {
-                const title = item.title || item.name || (isAr ? 'جدول أعمال منطقة أو منتدى' : 'Service Body Agenda');
-                const sbName = item.service_body_name || (isAr ? item.service_body?.ar_name : item.service_body?.en_name) || (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee');
+                const sbObj = item.service_body || serviceBodiesMap[item.service_body_id];
+                const sbName =
+                  (isAr ? sbObj?.ar_name : sbObj?.en_name) ||
+                  sbObj?.ar_name ||
+                  sbObj?.en_name ||
+                  item.service_body_name ||
+                  (isAr ? 'لجنة خدمة الإقليم (RSC)' : 'Regional Service Committee');
+                const title = item.title || item.name || sbName;
                 const isApproved = item.status === 'approved';
                 const dateStr = item.meeting_date || item.agenda_date || item.created_at || '';
 
@@ -807,7 +944,7 @@ export default function AgendasScreen() {
 
                     <AppButton
                       title={isAr ? 'عرض جدول الأعمال ومحضر الاجتماع' : 'View Agenda & Minutes'}
-                      onPress={() => handleOpenItem(item, 'service_body', title)}
+                      onPress={() => handleOpenItem(item, 'service_body', sbName)}
                       variant="primary"
                       size="sm"
                       icon={<Eye size={15} color="#ffffff" />}
@@ -1301,11 +1438,37 @@ export default function AgendasScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      <SubmitAgendaModal
+        visible={isSubmitModalVisible}
+        onClose={() => setIsSubmitModalVisible(false)}
+        onSuccess={() => {
+          setIsSubmitModalVisible(false);
+          fetchAllData();
+        }}
+        userGroup={userAssociatedGroup}
+        availableGroups={allGroups}
+        defaultSubmitterName={user?.name}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actionHeaderBar: {
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  nonGroupServantBanner: {
+    padding: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
   screenWrapper: {
     flex: 1,
   },
