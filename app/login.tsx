@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
@@ -14,10 +13,11 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
-  Lock,
   ShieldCheck,
   Smartphone,
-  RefreshCw,
+  AlertCircle,
+  FileText,
+  UserCheck,
 } from 'lucide-react-native';
 import { NALogo } from '../src/components/NALogo';
 import { useAppTheme } from '../src/theme';
@@ -26,103 +26,67 @@ import { haptic } from '../src/utils/haptics';
 import { azureAuthService } from '../src/services/azureAuthService';
 
 export default function LoginScreen() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const router = useRouter();
-  const { colors, borderRadius, shadows } = useAppTheme();
+  const { colors, borderRadius, shadows, isDark } = useAppTheme();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authStatusMessage, setAuthStatusMessage] = useState<string | null>(null);
+  const [successServantName, setSuccessServantName] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleMicrosoftLogin = async () => {
+    if (isAuthenticating || successServantName) return;
+
     haptic.selection();
     setIsAuthenticating(true);
-    setAuthStatusMessage(
-      isAr
-        ? 'جاري الاتصال بحسابات مايكروسوفت وتطبيق Authenticator...'
-        : 'Connecting to Microsoft & Authenticator Broker...'
-    );
+    setErrorMessage(null);
 
     try {
       const result = await azureAuthService.loginInteractive();
 
+      // Silent cancellation: if user dismissed or cancelled, reset quietly
       if (result.cancelled) {
-        setAuthStatusMessage(null);
+        setIsAuthenticating(false);
         return;
       }
 
       if (result.success && result.sanctumToken) {
         haptic.success();
-        const servantName = result.user?.name || (isAr ? 'خادم مؤتمن' : 'Trusted Servant');
-        Alert.alert(
-          isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
-          isAr
-            ? `مرحباً بك، ${servantName}. تم تسجيل الدخول بنجاح بحساب مايكروسوفت المؤسسي.`
-            : `Welcome, ${servantName}. Signed in successfully with your Microsoft Servant account.`
-        );
-        router.back();
+        const servantName =
+          result.user?.name || (isAr ? 'خادم مؤتمن' : 'Trusted Servant');
+        setSuccessServantName(servantName);
+        setIsAuthenticating(false);
+
+        // Auto-dismiss smoothly after brief visual feedback
+        setTimeout(() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/agendas');
+          }
+        }, 750);
         return;
       }
 
-      // Handle failure
+      // Handle explicit auth error
       haptic.warning();
-      Alert.alert(
-        isAr ? 'تنبيه المصادقة' : 'Authentication Notice',
+      setErrorMessage(
         result.error ||
-        (isAr
-          ? 'تعذر إتمام عملية الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.'
-          : 'Could not complete Microsoft sign in. Please try again.')
+          (isAr
+            ? 'تعذر إتمام تسجيل الدخول عبر مايكروسوفت. يرجى المحاولة مرة أخرى.'
+            : 'Could not complete Microsoft sign-in. Please try again.')
       );
     } catch (error: any) {
       console.warn('OAuth Error:', error);
       haptic.error();
-      Alert.alert(
-        isAr ? 'خطأ في الاتصال' : 'Connection Error',
+      setErrorMessage(
         isAr
-          ? 'تعذر الاتصال بخدمة مايكروسوفت أو خادم NA Egypt. يرجى التأكد من اتصالك بالإنترنت والمحاولة مجدداً.'
-          : 'Could not connect to Microsoft or NA Egypt server. Please verify your internet connection.'
+          ? 'تعذر الاتصال بخدمة مايكروسوفت أو خادم NA Egypt. يرجى التأكد من اتصالك بالإنترنت.'
+          : 'Could not connect to Microsoft or NA Egypt server. Please verify your connection.'
       );
     } finally {
       setIsAuthenticating(false);
-      setAuthStatusMessage(null);
-    }
-  };
-
-  const handleWebFallbackLogin = async () => {
-    haptic.light();
-    setIsAuthenticating(true);
-    setAuthStatusMessage(
-      isAr
-        ? 'جاري فتح بوابة الويب البديلة للدخول...'
-        : 'Opening web authentication portal...'
-    );
-
-    try {
-      const result = await azureAuthService.loginWithBackendRedirect();
-      if (result.cancelled) {
-        return;
-      }
-
-      if (result.success) {
-        haptic.success();
-        Alert.alert(
-          isAr ? 'نجاح تسجيل الدخول' : 'Sign In Successful',
-          isAr
-            ? 'تم تسجيل الدخول بنجاح عبر بوابة الويب.'
-            : 'Signed in successfully via Web portal.'
-        );
-        router.back();
-      } else {
-        Alert.alert(
-          isAr ? 'فشل تسجيل الدخول' : 'Sign In Failed',
-          result.error || (isAr ? 'تعذر إتمام الدخول' : 'Failed to authenticate')
-        );
-      }
-    } catch (e) {
-      Alert.alert(isAr ? 'خطأ' : 'Error', isAr ? 'حدث خطأ غير متوقع' : 'Unexpected error');
-    } finally {
-      setIsAuthenticating(false);
-      setAuthStatusMessage(null);
     }
   };
 
@@ -131,11 +95,16 @@ export default function LoginScreen() {
       style={[styles.container, { backgroundColor: colors.bgPrimary }]}
       edges={['top', 'bottom']}
     >
-      <View style={styles.topBar}>
+      {/* Top Bar */}
+      <View style={[styles.topBar, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           onPress={() => {
             haptic.light();
-            router.back();
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/agendas');
+            }
           }}
           style={[styles.backIconBtn, { backgroundColor: colors.cardBg }]}
           accessibilityRole="button"
@@ -154,20 +123,31 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Branding */}
+        {/* Branding Area */}
         <View style={styles.headerArea}>
           <View style={styles.logoBox}>
-            <NALogo size={68} />
+            <NALogo size={64} />
           </View>
           <AppText variant="h2" color={colors.primary} weight="800" align="center">
-            {isAr ? 'زمالة المدمنين المجهولين في مصر' : 'Narcotics Anonymous - Egypt'}
+            {isAr ? 'زمالة المدمنين المجهولين' : 'Narcotics Anonymous'}
           </AppText>
+          <AppText
+            variant="h4"
+            color={colors.textSecondary}
+            weight="600"
+            align="center"
+            style={{ marginTop: 2 }}
+          >
+            {isAr ? 'مصر • NA Egypt' : 'Egypt Fellowship'}
+          </AppText>
+
           <Badge
-            label={isAr ? 'بوابة خادمي المجموعات واللجان' : 'Trusted Servants Portal'}
+            label={isAr ? 'بوابة الخدام الموثوقين' : 'Trusted Servants Portal'}
             variant="accent"
             size="md"
-            style={{ marginVertical: 8 }}
+            style={{ marginVertical: 12 }}
           />
+
           <AppText
             variant="body"
             color={colors.textSecondary}
@@ -175,12 +155,12 @@ export default function LoginScreen() {
             style={styles.subtitle}
           >
             {isAr
-              ? 'تسجيل الدخول الموحد (Microsoft SSO) للاطلاع على جداول أعمال الالمنتديات أو المناطق الخدمية، محاضر الاجتماعات والتقارير الإقليمية.'
-              : 'Single Sign-On (Microsoft SSO) to view Service Body Agendas, Meeting Minutes, and Regional Committee Reports.'}
+              ? 'تسجيل الدخول المؤسسي الموحد (Microsoft SSO) للاطلاع على أجندات اللجان وتقارير المناطق الخدمية.'
+              : 'Single Sign-On (Microsoft SSO) to view Service Body Agendas, Minutes, and Committee Reports.'}
           </AppText>
         </View>
 
-        {/* Microsoft SSO Card */}
+        {/* Main Authentication Card */}
         <View
           style={[
             styles.mainCard,
@@ -192,89 +172,135 @@ export default function LoginScreen() {
             },
           ]}
         >
-          <View style={styles.lockRow}>
-            <ShieldCheck size={18} color={colors.accentDark} style={{ marginEnd: 6 }} />
-            <AppText variant="h4" color={colors.textPrimary} weight="700">
-              {isAr ? 'المصادقة المؤسسية الآمنة' : 'Secure Organizational Auth'}
+          <View style={[styles.cardHeaderRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <ShieldCheck size={20} color={colors.accentDark} />
+            <AppText
+              variant="h4"
+              color={colors.textPrimary}
+              weight="700"
+              style={{ marginHorizontal: 8 }}
+            >
+              {isAr ? 'المصادقة المؤسسية المعتمدة' : 'Verified Servant Authentication'}
             </AppText>
           </View>
 
-          {/* Microsoft Login Button */}
-          <TouchableOpacity
-            style={[
-              styles.microsoftButton,
-              { borderRadius: borderRadius.md, opacity: isAuthenticating ? 0.8 : 1 },
-            ]}
-            onPress={handleMicrosoftLogin}
-            disabled={isAuthenticating}
-            activeOpacity={0.88}
-            accessibilityRole="button"
-            accessibilityLabel={
-              isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'
-            }
-          >
-            {isAuthenticating ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color="#ffffff" size="small" style={{ marginEnd: 10 }} />
-                <AppText variant="body" color="#ffffff" weight="600" style={styles.msButtonText}>
-                  {isAr ? 'جاري التحقق والمصادقة...' : 'Authenticating...'}
+          {/* Success Banner */}
+          {successServantName ? (
+            <View
+              style={[
+                styles.successBanner,
+                { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.16)' : '#edfbf2' },
+              ]}
+            >
+              <CheckCircle2 size={24} color={colors.success} />
+              <View style={[styles.successTextContainer, { alignItems: isAr ? 'flex-end' : 'flex-start' }]}>
+                <AppText variant="body" color={colors.success} weight="700">
+                  {isAr ? 'تم تسجيل الدخول بنجاح!' : 'Successfully Signed In!'}
+                </AppText>
+                <AppText variant="caption" color={colors.textPrimary} weight="600">
+                  {isAr ? `مرحباً بك، ${successServantName}` : `Welcome, ${successServantName}`}
                 </AppText>
               </View>
-            ) : (
-              <View style={styles.msButtonContent}>
-                {/* Official 4-Color Microsoft Square */}
-                <MicrosoftLogo size={20} style={{ marginEnd: 10 }} />
-                <AppText variant="body" color="#ffffff" weight="700" style={styles.msButtonText}>
-                  {isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'}
-                </AppText>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Broker Status Helper */}
-          {authStatusMessage ? (
-            <View style={styles.statusBox}>
-              <Smartphone size={14} color={colors.primary} style={{ marginEnd: 6 }} />
-              <AppText variant="caption" color={colors.primary} weight="600" style={{ flex: 1 }}>
-                {authStatusMessage}
-              </AppText>
             </View>
-          ) : null}
+          ) : (
+            <>
+              {/* Error Notice if any */}
+              {errorMessage ? (
+                <View
+                  style={[
+                    styles.errorBanner,
+                    { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#fef2f2' },
+                  ]}
+                >
+                  <AlertCircle size={18} color={colors.danger} style={{ marginEnd: 8 }} />
+                  <AppText
+                    variant="caption"
+                    color={colors.danger}
+                    weight="600"
+                    style={{ flex: 1, textAlign: isAr ? 'right' : 'left' }}
+                  >
+                    {errorMessage}
+                  </AppText>
+                </View>
+              ) : null}
 
-          {/* Guidelines & Features */}
+              {/* Single Microsoft Sign-In Button */}
+              <TouchableOpacity
+                style={[
+                  styles.microsoftButton,
+                  {
+                    borderRadius: borderRadius.md,
+                    opacity: isAuthenticating ? 0.85 : 1,
+                  },
+                ]}
+                onPress={handleMicrosoftLogin}
+                disabled={isAuthenticating}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'
+                }
+              >
+                {isAuthenticating ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color="#ffffff" size="small" style={{ marginEnd: 10 }} />
+                    <AppText variant="body" color="#ffffff" weight="600">
+                      {isAr ? 'جاري الاتصال بمايكروسوفت...' : 'Connecting to Microsoft...'}
+                    </AppText>
+                  </View>
+                ) : (
+                  <View style={styles.msButtonContent}>
+                    <MicrosoftLogo size={20} style={{ marginEnd: 12 }} />
+                    <AppText variant="body" color="#ffffff" weight="700">
+                      {isAr ? 'تسجيل الدخول بحساب مايكروسوفت' : 'Sign in with Microsoft'}
+                    </AppText>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Value Props & Servant Guidelines */}
           <View style={[styles.featuresList, { borderTopColor: colors.borderSubtle }]}>
-            <View style={styles.featureItem}>
-              <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
-              <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'دعم Microsoft Authenticator واختيار الحساب المباشر' : 'Microsoft Authenticator & Account Picker support'}
+            <View style={[styles.featureItem, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <Smartphone size={16} color={colors.primary} style={isAr ? styles.featureIconAr : styles.featureIconEn} />
+              <AppText
+                variant="caption"
+                color={colors.textSecondary}
+                style={[styles.featureText, { textAlign: isAr ? 'right' : 'left' }]}
+              >
+                {isAr
+                  ? 'دعم مباشر لتطبيق Microsoft Authenticator وتحديد الحساب'
+                  : 'Direct Microsoft Authenticator & Account Picker support'}
               </AppText>
             </View>
-            <View style={styles.featureItem}>
-              <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
-              <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'الوصول المباشر لأجندات اللجان وتقارير الالمنتديات أو المناطق الخدمية' : 'Direct access to Sub-committee Agendas & reports'}
+
+            <View style={[styles.featureItem, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <FileText size={16} color={colors.primary} style={isAr ? styles.featureIconAr : styles.featureIconEn} />
+              <AppText
+                variant="caption"
+                color={colors.textSecondary}
+                style={[styles.featureText, { textAlign: isAr ? 'right' : 'left' }]}
+              >
+                {isAr
+                  ? 'الاطلاع على جداول أعمال ومحاضر اجتماعات اللجان والمناطق'
+                  : 'Instant access to Live Agendas, Minutes & Archive'}
               </AppText>
             </View>
-            <View style={styles.featureItem}>
-              <CheckCircle2 size={16} color={colors.success} style={styles.checkIcon} />
-              <AppText variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
-                {isAr ? 'خاص ومقيد بحسابات @naegypt.org المعتمدة' : 'Exclusive to verified @naegypt.org accounts'}
+
+            <View style={[styles.featureItem, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+              <UserCheck size={16} color={colors.success} style={isAr ? styles.featureIconAr : styles.featureIconEn} />
+              <AppText
+                variant="caption"
+                color={colors.textSecondary}
+                style={[styles.featureText, { textAlign: isAr ? 'right' : 'left' }]}
+              >
+                {isAr
+                  ? 'خاص ومقيد بالبريد الإلكتروني المعتمد @naegypt.org'
+                  : 'Exclusively restricted to authorized @naegypt.org accounts'}
               </AppText>
             </View>
           </View>
-
-          {/* Fallback Web Portal Option */}
-          <TouchableOpacity
-            style={styles.fallbackBtn}
-            onPress={handleWebFallbackLogin}
-            disabled={isAuthenticating}
-            activeOpacity={0.7}
-          >
-            <RefreshCw size={13} color={colors.textMuted} style={{ marginEnd: 6 }} />
-            <AppText variant="caption" color={colors.textMuted} weight="500">
-              {isAr ? 'استخدام بوابة الويب البديلة' : 'Use web redirect fallback'}
-            </AppText>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -286,21 +312,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   backIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
@@ -310,28 +336,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoBox: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   subtitle: {
     marginTop: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     lineHeight: 22,
   },
   mainCard: {
     width: '100%',
-    padding: 20,
+    padding: 22,
     borderWidth: 1,
   },
-  lockRow: {
-    flexDirection: 'row',
+  cardHeaderRow: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   microsoftButton: {
     backgroundColor: '#2F2F2F',
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,
@@ -346,49 +371,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  msLogo: {
-    width: 18,
-    height: 18,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
-    marginEnd: 10,
-  },
-  msSquare: {
-    width: 8,
-    height: 8,
-  },
-  msButtonText: {
-    fontSize: 15,
-  },
-  statusBox: {
+  successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e4f7fa',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  successTextContainer: {
+    flex: 1,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
     borderRadius: 8,
-    marginTop: 12,
+    marginBottom: 14,
   },
   featuresList: {
-    marginTop: 20,
-    paddingTop: 16,
+    marginTop: 22,
+    paddingTop: 18,
     borderTopWidth: 1,
-    gap: 10,
+    gap: 14,
   },
   featureItem: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
-  checkIcon: {
-    marginEnd: 8,
+  featureIconAr: {
+    marginStart: 10,
   },
-  fallbackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    paddingVertical: 6,
+  featureIconEn: {
+    marginEnd: 10,
+  },
+  featureText: {
+    flex: 1,
+    lineHeight: 18,
   },
 });

@@ -3,7 +3,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as WebBrowser from 'expo-web-browser';
 import '../src/i18n'; // Initialize i18next
+
+// Ensure any OAuth redirect cleanly completes and closes the browser session
+WebBrowser.maybeCompleteAuthSession();
 import { seedInitialLocalData, pullMasterData } from '../src/database/sync';
 import { startOutboxNetworkListener } from '../src/database/outboxWorker';
 import { OfflineBanner } from '../src/components/OfflineBanner';
@@ -53,6 +57,13 @@ export default function RootLayout() {
               title: 'تسجيل دخول الخدامات • Microsoft SSO',
               presentation: 'modal',
               headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="auth-callback"
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
             }}
           />
         </Stack>

@@ -32,30 +32,30 @@ export interface LoginResult {
   error?: string;
 }
 
+let isAuthInProgress = false;
+
 /**
- * Returns the appropriate redirect URI based on platform and broker registration.
+ * Returns the standardized custom scheme redirect URI across all platforms.
  */
 export function getAzureRedirectUri(): string {
-  if (Platform.OS === 'android') {
-    return (
-      process.env.EXPO_PUBLIC_AZURE_REDIRECT_URI ||
-      'msauth://org.naegypt.app/Xo8WBi6jzSxKDVR4drqm84yr9iU%3D'
-    );
-  } else if (Platform.OS === 'ios') {
-    return 'msauth.org.naegypt.app://auth';
-  }
-  return AuthSession.makeRedirectUri({
-    scheme: 'naegypt',
-    path: 'auth-callback',
-  });
+  return (
+    process.env.EXPO_PUBLIC_AZURE_REDIRECT_URI ||
+    'naegypt://auth-callback'
+  );
 }
 
 export const azureAuthService = {
   /**
    * Initiates Interactive Microsoft / Azure AD login with account chooser support.
-   * Gracefully handles broker redirect, web browser popup, and token exchange with backend.
+   * Uses standardized custom scheme 'naegypt://auth-callback' and PKCE exchange.
+   * Protected with in-flight lock to guarantee no duplicate browser windows.
    */
   async loginInteractive(): Promise<LoginResult> {
+    if (isAuthInProgress) {
+      return { success: false, cancelled: true };
+    }
+    isAuthInProgress = true;
+
     try {
       const redirectUri = getAzureRedirectUri();
 
@@ -72,9 +72,9 @@ export const azureAuthService = {
         },
       });
 
-      // Prompt user with native broker / system browser
+      // Prompt user with single system browser tab
       const authResponse = await authRequest.promptAsync(discoveryEndpoints, {
-        showInRecents: true,
+        showInRecents: false,
       });
 
       if (authResponse.type === 'cancel' || authResponse.type === 'dismiss') {
@@ -141,9 +141,12 @@ export const azureAuthService = {
       };
     } catch (error: any) {
       console.warn('Azure Interactive Auth Error:', error);
-      // If PKCE direct exchange fails (e.g. strict single-tenant client secret requirement),
-      // attempt hybrid backend redirect fallback
-      return await azureAuthService.loginWithBackendRedirect();
+      return {
+        success: false,
+        error: error?.message || 'Authentication encountered an unexpected error.',
+      };
+    } finally {
+      isAuthInProgress = false;
     }
   },
 
@@ -151,6 +154,11 @@ export const azureAuthService = {
    * Fallback: Authenticates via the backend OAuth redirection route (GET /auth/azure/redirect).
    */
   async loginWithBackendRedirect(): Promise<LoginResult> {
+    if (isAuthInProgress) {
+      return { success: false, cancelled: true };
+    }
+    isAuthInProgress = true;
+
     try {
       const redirectUri = 'naegypt://auth-callback';
       const authUrl = `https://naegypt.org/auth/azure/redirect?redirect_uri=${encodeURIComponent(
@@ -205,6 +213,8 @@ export const azureAuthService = {
         success: false,
         error: e.message || 'Connection error during Microsoft Authentication.',
       };
+    } finally {
+      isAuthInProgress = false;
     }
   },
 

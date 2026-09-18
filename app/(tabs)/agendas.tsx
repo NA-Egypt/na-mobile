@@ -376,6 +376,34 @@ export default function AgendasScreen() {
         (typeof r === 'string' ? r : r.name || r.slug || '').toLowerCase()
       )
     : [];
+
+  const userEmail = (user?.email || '').toLowerCase();
+
+  // Super Admin / RSC check: full access across fellowship
+  const isSuperAdminOrRsc = Boolean(
+    userRoles.some(
+      (r) =>
+        r.includes('super admin') ||
+        r.includes('super_admin') ||
+        r.includes('rsc') ||
+        r.includes('admin')
+    ) ||
+    userEmail.includes('admin@') ||
+    userEmail.includes('rsc@')
+  );
+
+  // Service Body assignment
+  const userServiceBodyId =
+    user?.service_body_id != null ? Number(user.service_body_id) : null;
+  const isServiceBodyServant = !isSuperAdminOrRsc && Boolean(userServiceBodyId);
+  const userSbObj = userServiceBodyId ? serviceBodiesMap[userServiceBodyId] : null;
+  const servantAreaName = userSbObj
+    ? ((isAr ? userSbObj.ar_name : userSbObj.en_name) ||
+        userSbObj.ar_name ||
+        userSbObj.en_name ||
+        (userSbObj as any).name)
+    : null;
+
   const hasGsrRole = userRoles.some(
     (r) => r.includes('gsr') || r.includes('group') || r.includes('مجموعة')
   );
@@ -405,16 +433,22 @@ export default function AgendasScreen() {
 
   const targetGroupId = directUserGroupId || userAssociatedGroup?.id;
 
-  // Group User flag: User is a GSR or linked to a specific group
-  const isGroupUser = Boolean(
-    hasGsrRole ||
-    targetGroupId ||
-    userAssociatedGroup ||
-    user?.email?.toLowerCase().includes('group') ||
-    user?.name?.includes('مجموعة')
-  );
+  // Group User flag: User is a GSR or linked to a specific group (only if not RSC or Service Body servant)
+  const isGroupUser =
+    !isSuperAdminOrRsc &&
+    !isServiceBodyServant &&
+    Boolean(
+      hasGsrRole ||
+      targetGroupId ||
+      userAssociatedGroup ||
+      user?.email?.toLowerCase().includes('group') ||
+      user?.name?.includes('مجموعة')
+    );
 
-  // Strict role filtering: Group servants strictly see only their group agendas
+  // Strict role filtering:
+  // 1. Group servants strictly see only their group agendas
+  // 2. Service body servants strictly see agendas from groups belonging to their service body
+  // 3. Super Admin / RSC see all group agendas
   const filteredGroupAgendas = isGroupUser
     ? groupAgendas.filter((a) => {
         if (targetGroupId && Number(a.group_id) === Number(targetGroupId)) {
@@ -432,13 +466,47 @@ export default function AgendasScreen() {
         }
         return false;
       })
-    : groupAgendas;
+    : isServiceBodyServant && userServiceBodyId
+      ? groupAgendas.filter((a) => {
+          const groupObj =
+            a.group ||
+            groupsMap[Number(a.group_id)] ||
+            groupsMap[a.group_id];
+          const agendaSbId = Number(
+            a.service_body_id ||
+            groupObj?.service_body_id ||
+            groupObj?.service_body?.id ||
+            a.group?.service_body_id
+          );
+          return agendaSbId === userServiceBodyId;
+        })
+      : groupAgendas;
+
+  // Strict role filtering for Service Bodies tab:
+  // Service body servants strictly see only their own service body's agendas
+  // Super Admin / RSC and GSRs see all service body agendas
+  const filteredServiceBodyAgendas =
+    isServiceBodyServant && userServiceBodyId
+      ? serviceBodyAgendas.filter((sbAgenda) => {
+          const agendaSbId = Number(
+            sbAgenda.service_body_id ||
+            sbAgenda.service_body?.id
+          );
+          return agendaSbId === userServiceBodyId;
+        })
+      : serviceBodyAgendas;
+
+  // Group selector for submit modal: restricted to area groups for Service Body servants
+  const availableGroupsForSubmit =
+    isServiceBodyServant && userServiceBodyId
+      ? allGroups.filter((g) => Number(g.service_body_id) === userServiceBodyId)
+      : allGroups;
 
   const currentList = (
     activeTab === 'groups'
       ? filteredGroupAgendas
       : activeTab === 'service_bodies'
-        ? serviceBodyAgendas
+        ? filteredServiceBodyAgendas
         : committeeReports
   ).filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'));
 
@@ -561,6 +629,19 @@ export default function AgendasScreen() {
                     variant="accent"
                     size="sm"
                   />
+                  {servantAreaName ? (
+                    <Badge
+                      label={servantAreaName}
+                      variant="primary"
+                      size="sm"
+                    />
+                  ) : isSuperAdminOrRsc ? (
+                    <Badge
+                      label={isAr ? 'إقليم مصر (RSC)' : 'Egypt Region (RSC)'}
+                      variant="success"
+                      size="sm"
+                    />
+                  ) : null}
                 </View>
                 <AppText variant="caption" color={colors.textSecondary}>
                   {user.email}
@@ -818,6 +899,70 @@ export default function AgendasScreen() {
                         {(isAr ? userAssociatedGroup?.ar_name : userAssociatedGroup?.en_name) ||
                           userAssociatedGroup?.ar_name ||
                           (isAr ? 'مجموعتي' : 'My Group')}
+                      </AppText>
+                    </View>
+                    <AppButton
+                      title={isAr ? 'تقديم أجندة جديدة' : 'Submit New Agenda'}
+                      onPress={() => {
+                        haptic.selection();
+                        setIsSubmitModalVisible(true);
+                      }}
+                      variant="primary"
+                      size="sm"
+                      icon={<Plus size={15} color="#ffffff" />}
+                    />
+                  </View>
+                ) : isServiceBodyServant ? (
+                  <View
+                    style={[
+                      styles.actionHeaderBar,
+                      shadows.card,
+                      {
+                        backgroundColor: colors.cardBg,
+                        borderColor: colors.cardBorder,
+                        borderRadius: borderRadius.lg,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="caption" color={colors.textSecondary}>
+                        {isAr ? 'مجموعات منطقتك الخدمية' : 'Member Groups in Your Area'}
+                      </AppText>
+                      <AppText variant="h4" color={colors.textPrimary} weight="700">
+                        {servantAreaName || (isAr ? 'هيئة الخدمة' : 'Service Body')}
+                      </AppText>
+                    </View>
+                    <AppButton
+                      title={isAr ? 'تقديم أجندة لمجموعة' : 'Submit Group Agenda'}
+                      onPress={() => {
+                        haptic.selection();
+                        setIsSubmitModalVisible(true);
+                      }}
+                      variant="primary"
+                      size="sm"
+                      icon={<Plus size={15} color="#ffffff" />}
+                    />
+                  </View>
+                ) : isSuperAdminOrRsc ? (
+                  <View
+                    style={[
+                      styles.actionHeaderBar,
+                      shadows.card,
+                      {
+                        backgroundColor: colors.cardBg,
+                        borderColor: colors.cardBorder,
+                        borderRadius: borderRadius.lg,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="caption" color={colors.textSecondary}>
+                        {isAr ? 'أرشيف مجموعات مصر الشامل' : 'All Egypt Groups Archive'}
+                      </AppText>
+                      <AppText variant="h4" color={colors.textPrimary} weight="700">
+                        {isAr ? 'إقليم مصر (RSC)' : 'Egypt Region (RSC)'}
                       </AppText>
                     </View>
                     <AppButton
@@ -1124,16 +1269,32 @@ export default function AgendasScreen() {
                 title={
                   activeTab === 'groups' && isGroupUser
                     ? (isAr ? 'لا توجد جداول أعمال مسجلة لمجموعتك بعد' : 'No agendas recorded for your group yet')
-                    : (isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section')
+                    : activeTab === 'groups' && isServiceBodyServant
+                      ? (isAr
+                          ? `لا توجد جداول أعمال مسجلة لمجموعات ${servantAreaName || 'منطقتك'} بعد`
+                          : `No agendas recorded for groups in ${servantAreaName || 'your area'} yet`)
+                      : activeTab === 'service_bodies' && isServiceBodyServant
+                        ? (isAr
+                            ? `لا توجد جداول أعمال مسجلة لـ ${servantAreaName || 'منطقتك'} بعد`
+                            : `No agendas recorded for ${servantAreaName || 'your service body'} yet`)
+                        : (isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section')
                 }
                 description={
                   activeTab === 'groups' && isGroupUser
                     ? (isAr
                         ? 'يمكنك تقديم تقرير جدول أعمال جديد لمجموعتك من خلال زر "تقديم أجندة جديدة" أعلاه.'
                         : 'You can submit a new business agenda report for your group using the button above.')
-                    : (isAr
-                        ? 'يتم عرض تقارير وأرشيف اللجان وجداول الأعمال مباشرة من الخادم وفقاً لصلاحيات حسابك المعتمد.'
-                        : 'Agendas and Committee records load directly from the server according to your verified account permissions.')
+                    : activeTab === 'groups' && isServiceBodyServant
+                      ? (isAr
+                          ? 'يتم هنا حصر ومتابعة جداول أعمال وتقارير المجموعات التابعة لمنطقتك الخدمية فقط.'
+                          : 'Only business agendas submitted by groups belonging to your service body are shown here.')
+                      : activeTab === 'service_bodies' && isServiceBodyServant
+                        ? (isAr
+                            ? 'يتم عرض جداول أعمال ومحاضر اجتماعات هيئة الخدمة الخاصة بمنطقتك فقط.'
+                            : 'Only agendas and meeting minutes for your designated service body are displayed here.')
+                        : (isAr
+                            ? 'يتم عرض تقارير وأرشيف اللجان وجداول الأعمال مباشرة من الخادم وفقاً لصلاحيات حسابك المعتمد.'
+                            : 'Agendas and Committee records load directly from the server according to your verified account permissions.')
                 }
               />
             }
@@ -1562,7 +1723,7 @@ export default function AgendasScreen() {
           fetchAllData();
         }}
         userGroup={userAssociatedGroup}
-        availableGroups={allGroups}
+        availableGroups={availableGroupsForSubmit}
         defaultSubmitterName={user?.name}
       />
     </View>
