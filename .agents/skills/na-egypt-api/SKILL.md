@@ -420,7 +420,7 @@ Provides schema discovery, public call response logging, and authenticated admin
 
 #### `GET /api/v1/helpline-calls/schema`
 - **Access:** Public
-- **Description:** Returns the dynamic form schema, including localized field order, duration options, active shifts (incorporating the `8:00 PM - 10:00 PM` shift), caller types, referral sources, and active volunteer directory.
+- **Description:** Returns the dynamic form schema, including localized field order, duration options, active shifts (incorporating the `8:00 PM - 10:00 PM` shift), caller types, referral sources, active volunteer directory, and dynamic conditional validation rules.
 - **Response (200 OK):**
   ```json
   {
@@ -462,7 +462,9 @@ Provides schema discovery, public call response logging, and authenticated admin
       "Yellow Pages",
       "Facebook",
       "TikTok",
+      "ChatGPT",
       "Instagram",
+      "YouTube",
       "أخرى"
     ],
     "durations": [
@@ -477,13 +479,38 @@ Provides schema discovery, public call response logging, and authenticated admin
       "call_date",
       "call_time_shift",
       "caller_type",
+      "caller_type_other",
       "referral_source",
+      "referral_source_other",
+      "hospital_name",
+      "poster_location",
       "volunteer_name",
+      "volunteer_name_other",
       "is_step_12",
       "call_brief",
       "discuss_in_meeting",
       "additional_info"
-    ]
+    ],
+    "conditional_fields": {
+      "call_brief": {
+        "rule": "optional_if",
+        "field": "caller_type",
+        "value": "عضو حالي",
+        "description": "Call brief is optional when caller_type is \"عضو حالي\", required otherwise."
+      },
+      "hospital_name": {
+        "rule": "required_if",
+        "field": "referral_source",
+        "value": "لجنة المستشفيات",
+        "description": "Hospital name is required when referral_source is \"لجنة المستشفيات\"."
+      },
+      "poster_location": {
+        "rule": "required_if",
+        "field": "referral_source",
+        "value": "ملصقات الزمالة",
+        "description": "Poster location is required when referral_source is \"ملصقات الزمالة\"."
+      }
+    }
   }
   ```
 
@@ -498,10 +525,12 @@ Provides schema discovery, public call response logging, and authenticated admin
   - `caller_type_other`: `nullable|string|max:255` (*Required with `422` validation failure if `caller_type === 'أخرى'`*)
   - `referral_source`: `required|string|max:100`
   - `referral_source_other`: `nullable|string|max:255` (*Required with `422` validation failure if `referral_source === 'أخرى'`*)
+  - `hospital_name`: `nullable|string|max:255` (*Required with `422` validation failure if `referral_source === 'لجنة المستشفيات'`*)
+  - `poster_location`: `nullable|string|max:255` (*Required with `422` validation failure if `referral_source === 'ملصقات الزمالة'`*)
   - `volunteer_name`: `required|string|max:150`
   - `volunteer_name_other`: `nullable|string|max:150` (*Required with `422` validation failure if `volunteer_name === 'أخرى'`*)
   - `is_step_12`: `required|boolean`
-  - `call_brief`: `required|string|min:3`
+  - `call_brief`: `required_unless:caller_type,عضو حالي|nullable|string` (*Optional when `caller_type === 'عضو حالي'`, required otherwise*)
   - `discuss_in_meeting`: `required|boolean`
   - `additional_info`: `nullable|string`
 - **Behavior:**
@@ -514,7 +543,8 @@ Provides schema discovery, public call response logging, and authenticated admin
     "call_date": "2026-09-17",
     "call_time_shift": "8:00 PM - 10:00 PM",
     "caller_type": "عضو حالي",
-    "referral_source": "جدول الاجتماعات",
+    "referral_source": "لجنة المستشفيات",
+    "hospital_name": "مستشفى العباسية للصحة النفسية",
     "volunteer_name": "محمد م.",
     "is_step_12": true,
     "call_brief": "طلب مساعدة هاتفية لخطوة 12 من عضو حالي.",
@@ -630,6 +660,12 @@ export interface HelplineSchemaResponse {
   durations: Array<{ value: string; label: string }>;
   volunteers: HelplineVolunteerItem[];
   fields_order: string[];
+  conditional_fields?: Record<string, {
+    rule: string;
+    field: string;
+    value: string;
+    description: string;
+  }>;
 }
 
 export interface HelplineCallPayload {
@@ -640,10 +676,12 @@ export interface HelplineCallPayload {
   caller_type_other?: string | null;
   referral_source: string;
   referral_source_other?: string | null;
+  hospital_name?: string | null;
+  poster_location?: string | null;
   volunteer_name: string;
   volunteer_name_other?: string | null;
   is_step_12: boolean;
-  call_brief: string;
+  call_brief?: string | null;
   discuss_in_meeting: boolean;
   additional_info?: string | null;
 }
@@ -749,3 +787,27 @@ Run the comprehensive PHPUnit automated test suite across all 13 API feature tes
 php vendor/bin/phpunit tests/Feature/Api/
 ```
 All feature test suites (`AgendaApiTest`, `AuthApiTest`, `CalendarEventApiTest`, `ChangeRequestApiTest`, `CompositeApiTest`, `CustomFormApiTest`, `DirectOnlineGroupApiTest`, `DirectoryApiTest`, `EventApiTest`, `HelplineCallApiTest`, `MeetingApiTest`, `ProtectedManagementApiTest`, `WorkgroupApiTest`) validate status codes (200/201/204/401/403/422), mass-assignment validation guards, JSON payloads, filtering, file uploads, conditional validation rules, and authorization barriers with 100% test passing (84 tests, 493 assertions).
+
+---
+
+## 7. API Telemetry, Mobile Usage Tracking & Super Admin Analytics
+
+All incoming `/api/v1/*` requests are intercepted by `App\Http\Middleware\TrackApiUsage` via a **zero-latency terminating hook (`terminate()`)** executed after the HTTP response has already flushed to the client.
+
+### Telemetry Headers for Mobile Clients
+Mobile apps (React Native / iOS / Android) are recommended to pass the following headers for granular analytics:
+- `X-App-Platform`: `android` | `ios` (normalized; fallback automatically parses User-Agent for iOS, Android, or Web)
+- `X-App-Version`: Current application release version (e.g., `1.0.4`)
+- `X-Device-Id`: Optional anonymous device installation UUID
+
+### Super Admin Analytics Module
+- **Route:** `GET /admin/api-usage` (Protected by `role:super admin` or `permission:view api analytics`).
+- **Features:**
+  - KPI Cards: Total Calls, Mobile Traffic (% and Android vs iOS breakdown), Avg Latency (ms), Error Rate (%).
+  - Visual Charts: Traffic Over Time (interactive line chart), Platform Distribution (doughnut), Top 10 API Endpoints, Status Code breakdown.
+  - Live Request Logs Table: Search, pagination, filter by date preset (Today, 7D, 30D, Custom), and request inspection modal.
+  - CSV Export: `GET /admin/api-usage/export`.
+- **Data Retention:**
+  - `api_logs`: Pruned automatically after 30 days via `model:prune` using `MassPrunable`.
+  - `api_daily_stats`: Permanent daily aggregated counters generated via `php artisan api-logs:aggregate`.
+
