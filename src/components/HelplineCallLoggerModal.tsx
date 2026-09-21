@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import * as SecureStore from 'expo-secure-store';
 import {
   X,
   PhoneCall,
@@ -24,6 +25,9 @@ import {
   FileText,
   RotateCcw,
   Sparkles,
+  Building2,
+  MapPin,
+  AlertCircle,
 } from 'lucide-react-native';
 import { helplineApi } from '../api/helpline';
 import {
@@ -31,6 +35,7 @@ import {
   HelplineVolunteerItem,
   HelplineDurationOption,
   HelplineCallPayload,
+  HelplineConditionalRule,
 } from '../api/types';
 import { useAppTheme } from '../theme';
 import { AppText, AppButton, Badge } from './ui';
@@ -40,6 +45,8 @@ interface HelplineCallLoggerModalProps {
   visible: boolean;
   onClose: () => void;
 }
+
+const HELPLINE_DRAFT_STORAGE_KEY = 'na_egypt_helpline_call_draft_v2';
 
 const DEFAULT_SHIFTS = [
   '10:00 AM - 12:00 PM',
@@ -52,10 +59,10 @@ const DEFAULT_SHIFTS = [
 ];
 
 const DEFAULT_CALLER_TYPES = [
-  'عضو حالي',
   'أعضاء محتملة',
   'عضو محتمل منعزل',
   'بيانات اجتماعات',
+  'عضو حالي',
   'معلومات عن الزمالة',
   'أهالي وأقارب المدمنين',
   'عضو حالي منعزل',
@@ -76,9 +83,12 @@ const DEFAULT_REFERRAL_SOURCES = [
   'مكان علاجي',
   'لجنة المستشفيات',
   'صانع محتوى',
+  'Yellow Pages',
   'Facebook',
-  'Instagram',
   'TikTok',
+  'ChatGPT',
+  'Instagram',
+  'YouTube',
   'أخرى',
 ];
 
@@ -86,6 +96,27 @@ const DEFAULT_DURATIONS: HelplineDurationOption[] = [
   { value: 'less_than_5', label: 'أقل من 5 دقائق' },
   { value: 'more_than_5', label: 'أكثر من 5 دقائق' },
 ];
+
+const DEFAULT_CONDITIONAL_RULES: Record<string, HelplineConditionalRule> = {
+  call_brief: {
+    rule: 'optional_if',
+    field: 'caller_type',
+    value: 'عضو حالي',
+    description: 'Call brief is optional when caller_type is "عضو حالي", required otherwise.',
+  },
+  hospital_name: {
+    rule: 'required_if',
+    field: 'referral_source',
+    value: 'لجنة المستشفيات',
+    description: 'Hospital name is required when referral_source is "لجنة المستشفيات".',
+  },
+  poster_location: {
+    rule: 'required_if',
+    field: 'referral_source',
+    value: 'ملصقات الزمالة',
+    description: 'Poster location is required when referral_source is "ملصقات الزمالة".',
+  },
+};
 
 function getTodayString(): string {
   const d = new Date();
@@ -110,6 +141,7 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
   const [referralSources, setReferralSources] = useState<string[]>(DEFAULT_REFERRAL_SOURCES);
   const [durations, setDurations] = useState<HelplineDurationOption[]>(DEFAULT_DURATIONS);
   const [volunteers, setVolunteers] = useState<HelplineVolunteerItem[]>([]);
+  const [conditionalRules, setConditionalRules] = useState<Record<string, HelplineConditionalRule>>(DEFAULT_CONDITIONAL_RULES);
 
   // Form fields
   const [duration, setDuration] = useState<string>('less_than_5');
@@ -119,6 +151,8 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
   const [callerTypeOther, setCallerTypeOther] = useState<string>('');
   const [referralSource, setReferralSource] = useState<string>(DEFAULT_REFERRAL_SOURCES[0]);
   const [referralSourceOther, setReferralSourceOther] = useState<string>('');
+  const [hospitalName, setHospitalName] = useState<string>('');
+  const [posterLocation, setPosterLocation] = useState<string>('');
   const [volunteerName, setVolunteerName] = useState<string>('');
   const [volunteerNameOther, setVolunteerNameOther] = useState<string>('');
   const [isStep12, setIsStep12] = useState<boolean>(false);
@@ -126,15 +160,107 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
   const [discussInMeeting, setDiscussInMeeting] = useState<boolean>(false);
   const [additionalInfo, setAdditionalInfo] = useState<string>('');
 
-  // UI state
+  // UI & Validation state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState<boolean>(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const isDraftLoadedRef = useRef(false);
 
+  // Load Schema and Saved Draft
   useEffect(() => {
     if (visible) {
       loadSchema();
+      loadDraft();
     }
   }, [visible]);
+
+  const loadDraft = async () => {
+    try {
+      const saved = await SecureStore.getItemAsync(HELPLINE_DRAFT_STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft && typeof draft === 'object') {
+          if (draft.duration) setDuration(draft.duration);
+          if (draft.callDate) setCallDate(draft.callDate);
+          if (draft.callTimeShift) setCallTimeShift(draft.callTimeShift);
+          if (draft.callerType) setCallerType(draft.callerType);
+          if (draft.callerTypeOther) setCallerTypeOther(draft.callerTypeOther);
+          if (draft.referralSource) setReferralSource(draft.referralSource);
+          if (draft.referralSourceOther) setReferralSourceOther(draft.referralSourceOther);
+          if (draft.hospitalName) setHospitalName(draft.hospitalName);
+          if (draft.posterLocation) setPosterLocation(draft.posterLocation);
+          if (draft.volunteerName) setVolunteerName(draft.volunteerName);
+          if (draft.volunteerNameOther) setVolunteerNameOther(draft.volunteerNameOther);
+          if (typeof draft.isStep12 === 'boolean') setIsStep12(draft.isStep12);
+          if (draft.callBrief !== undefined) setCallBrief(draft.callBrief);
+          if (typeof draft.discussInMeeting === 'boolean') setDiscussInMeeting(draft.discussInMeeting);
+          if (draft.additionalInfo !== undefined) setAdditionalInfo(draft.additionalInfo);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not restore helpline call draft:', e);
+    } finally {
+      isDraftLoadedRef.current = true;
+    }
+  };
+
+  // Debounced auto-saving to SecureStore
+  useEffect(() => {
+    if (!visible || isSubmittedSuccess || !isDraftLoadedRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const draft = {
+          duration,
+          callDate,
+          callTimeShift,
+          callerType,
+          callerTypeOther,
+          referralSource,
+          referralSourceOther,
+          hospitalName,
+          posterLocation,
+          volunteerName,
+          volunteerNameOther,
+          isStep12,
+          callBrief,
+          discussInMeeting,
+          additionalInfo,
+        };
+        await SecureStore.setItemAsync(HELPLINE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      } catch (e) {
+        // silent fail on background draft save
+      }
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [
+    visible,
+    isSubmittedSuccess,
+    duration,
+    callDate,
+    callTimeShift,
+    callerType,
+    callerTypeOther,
+    referralSource,
+    referralSourceOther,
+    hospitalName,
+    posterLocation,
+    volunteerName,
+    volunteerNameOther,
+    isStep12,
+    callBrief,
+    discussInMeeting,
+    additionalInfo,
+  ]);
+
+  const clearSavedDraft = async () => {
+    try {
+      await SecureStore.deleteItemAsync(HELPLINE_DRAFT_STORAGE_KEY);
+    } catch (e) {
+      // silent
+    }
+  };
 
   const loadSchema = async () => {
     setIsLoadingSchema(true);
@@ -164,6 +290,12 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
             setVolunteerName(schema.volunteers[0].name);
           }
         }
+        if (schema.conditional_fields && typeof schema.conditional_fields === 'object') {
+          setConditionalRules((prev) => ({
+            ...prev,
+            ...schema.conditional_fields,
+          }));
+        }
       }
     } catch (e) {
       console.warn('Could not load dynamic helpline schema live, using fallback schema:', e);
@@ -172,12 +304,78 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
     }
   };
 
-  const handleResetForAnotherCall = () => {
+  // Dynamic Rule Evaluator
+  const isRuleActive = (targetField: string, ruleType: 'required_if' | 'optional_if'): boolean => {
+    const rule = conditionalRules[targetField];
+    if (!rule || rule.rule !== ruleType) return false;
+    if (rule.field === 'referral_source') {
+      return referralSource === rule.value;
+    }
+    if (rule.field === 'caller_type') {
+      return callerType === rule.value;
+    }
+    return false;
+  };
+
+  // Computed conditional flags
+  const isHospitalRequired =
+    isRuleActive('hospital_name', 'required_if') || referralSource === 'لجنة المستشفيات';
+  const isPosterLocationRequired =
+    isRuleActive('poster_location', 'required_if') || referralSource === 'ملصقات الزمالة';
+  const isCallBriefOptional =
+    isRuleActive('call_brief', 'optional_if') || callerType === 'عضو حالي';
+
+  // Caller Type Selection Handler
+  const handleSelectCallerType = (type: string) => {
     haptic.selection();
+    setCallerType(type);
+    if (type !== 'أخرى') {
+      setCallerTypeOther('');
+    }
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.caller_type;
+      delete next.caller_type_other;
+      if (type === 'عضو حالي') {
+        delete next.call_brief;
+      }
+      return next;
+    });
+  };
+
+  // Referral Source Selection Handler (Resets conditional fields when trigger changes)
+  const handleSelectReferralSource = (source: string) => {
+    haptic.selection();
+    setReferralSource(source);
+    if (source !== 'لجنة المستشفيات') {
+      setHospitalName('');
+    }
+    if (source !== 'ملصقات الزمالة') {
+      setPosterLocation('');
+    }
+    if (source !== 'أخرى') {
+      setReferralSourceOther('');
+    }
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.referral_source;
+      delete next.referral_source_other;
+      delete next.hospital_name;
+      delete next.poster_location;
+      return next;
+    });
+  };
+
+  const handleResetForAnotherCall = async () => {
+    haptic.selection();
+    await clearSavedDraft();
     setIsSubmittedSuccess(false);
+    setFieldErrors({});
     setCallDate(getTodayString());
     setCallBrief('');
     setAdditionalInfo('');
+    setHospitalName('');
+    setPosterLocation('');
     setIsStep12(false);
     setDiscussInMeeting(false);
     setCallerTypeOther('');
@@ -191,43 +389,65 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
   };
 
   const handleSubmit = async () => {
-    // Validation
-    const effectiveVolunteer = volunteerName === 'أخرى' || volunteerName === 'Other' ? volunteerNameOther.trim() : volunteerName.trim();
+    const errors: Record<string, string> = {};
+
+    // Volunteer validation
+    const effectiveVolunteer =
+      volunteerName === 'أخرى' || volunteerName === 'Other'
+        ? volunteerNameOther.trim()
+        : volunteerName.trim();
     if (!effectiveVolunteer) {
-      haptic.warning();
-      Alert.alert(
-        isAr ? 'تنبيه' : 'Notice',
-        isAr ? 'يرجى تحديد أو إدخال اسم المتطوع متلقي المكالمة.' : 'Please select or enter the volunteer name.'
-      );
-      return;
+      errors.volunteer = isAr
+        ? 'يرجى تحديد أو إدخال اسم المتطوع متلقي المكالمة.'
+        : 'Please select or enter the volunteer name.';
     }
 
+    // Caller type validation
     if (callerType === 'أخرى' && !callerTypeOther.trim()) {
-      haptic.warning();
-      Alert.alert(
-        isAr ? 'تنبيه' : 'Notice',
-        isAr ? 'يرجى توضيح نوع المتصل في الحقل المخصص.' : 'Please specify the caller type.'
-      );
-      return;
+      errors.caller_type_other = isAr
+        ? 'يرجى توضيح نوع المتصل في الحقل المخصص.'
+        : 'Please specify the caller type.';
     }
 
+    // Referral source validation
     if (referralSource === 'أخرى' && !referralSourceOther.trim()) {
+      errors.referral_source_other = isAr
+        ? 'يرجى توضيح مصدر المعرفة بالزمالة في الحقل المخصص.'
+        : 'Please specify the referral source.';
+    }
+
+    // Conditional: Hospital Name
+    if (isHospitalRequired && !hospitalName.trim()) {
+      errors.hospital_name = isAr
+        ? 'يرجى إدخال اسم المستشفى أو المؤسسة العلاجية التابعة للجنة المستشفيات.'
+        : 'Please enter the hospital or treatment facility name.';
+    }
+
+    // Conditional: Poster Location
+    if (isPosterLocationRequired && !posterLocation.trim()) {
+      errors.poster_location = isAr
+        ? 'يرجى تحديد مكان أو عنوان ملصق الزمالة.'
+        : 'Please specify the location/address of the fellowship poster.';
+    }
+
+    // Call Brief validation (Optional for 'عضو حالي', required otherwise)
+    if (!isCallBriefOptional) {
+      if (!callBrief.trim() || callBrief.trim().length < 3) {
+        errors.call_brief = isAr
+          ? 'يرجى كتابة ملخص موجز للمكالمة (3 أحرف على الأقل).'
+          : 'Please enter a brief summary of the call (min 3 chars).';
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       haptic.warning();
-      Alert.alert(
-        isAr ? 'تنبيه' : 'Notice',
-        isAr ? 'يرجى توضيح مصدر المعرفة بالزمالة في الحقل المخصص.' : 'Please specify the referral source.'
-      );
+      const firstErrorMessage = Object.values(errors)[0];
+      Alert.alert(isAr ? 'تنبيه' : 'Notice', firstErrorMessage);
       return;
     }
 
-    if (!callBrief.trim() || callBrief.trim().length < 3) {
-      haptic.warning();
-      Alert.alert(
-        isAr ? 'تنبيه' : 'Notice',
-        isAr ? 'يرجى كتابة ملخص موجز للمكالمة (3 أحرف على الأقل).' : 'Please enter a brief summary of the call (min 3 chars).'
-      );
-      return;
-    }
+    setFieldErrors({});
 
     const payload: HelplineCallPayload = {
       duration,
@@ -237,10 +457,13 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
       caller_type_other: callerType === 'أخرى' ? callerTypeOther.trim() : null,
       referral_source: referralSource,
       referral_source_other: referralSource === 'أخرى' ? referralSourceOther.trim() : null,
+      hospital_name: isHospitalRequired ? hospitalName.trim() : null,
+      poster_location: isPosterLocationRequired ? posterLocation.trim() : null,
       volunteer_name: effectiveVolunteer,
-      volunteer_name_other: volunteerName === 'أخرى' || volunteerName === 'Other' ? volunteerNameOther.trim() : null,
+      volunteer_name_other:
+        volunteerName === 'أخرى' || volunteerName === 'Other' ? volunteerNameOther.trim() : null,
       is_step_12: isStep12,
-      call_brief: callBrief.trim(),
+      call_brief: callBrief.trim() || null,
       discuss_in_meeting: discussInMeeting,
       additional_info: additionalInfo.trim() || null,
     };
@@ -250,16 +473,27 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
 
     try {
       await helplineApi.submitCall(payload);
+      await clearSavedDraft();
       haptic.success();
       setIsSubmittedSuccess(true);
     } catch (err: any) {
       console.warn('Failed to submit helpline call:', err);
       haptic.warning();
+      const backendErrors = err?.response?.data?.errors;
+      if (backendErrors && typeof backendErrors === 'object') {
+        const mappedErrors: Record<string, string> = {};
+        for (const [k, v] of Object.entries(backendErrors)) {
+          if (Array.isArray(v) && v[0]) {
+            mappedErrors[k] = v[0] as string;
+          }
+        }
+        setFieldErrors(mappedErrors);
+      }
       const errorMsg =
         err?.response?.data?.message ||
         (isAr
-          ? 'تعذر تسجيل المكالمة حالياً. تأكد من اتصال الإنترنت وحاول مرة أخرى.'
-          : 'Could not log the call. Please check your connection and try again.');
+          ? 'تعذر تسجيل المكالمة حالياً. تأكد من صحة البيانات واتصال الإنترنت وحاول مرة أخرى.'
+          : 'Could not log the call. Please check your data and connection and try again.');
       Alert.alert(isAr ? 'خطأ في التسجيل' : 'Submission Error', errorMsg);
     } finally {
       setIsSubmitting(false);
@@ -543,9 +777,10 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                   <TextInput
                     style={[
                       styles.textInput,
+                      fieldErrors.volunteer ? styles.inputError : null,
                       {
                         backgroundColor: colors.bgPrimary,
-                        borderColor: colors.cardBorder,
+                        borderColor: fieldErrors.volunteer ? colors.danger : colors.cardBorder,
                         color: colors.textPrimary,
                         borderRadius: borderRadius.md,
                         textAlign: isAr ? 'right' : 'left',
@@ -553,10 +788,28 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                       },
                     ]}
                     value={volunteerNameOther}
-                    onChangeText={setVolunteerNameOther}
+                    onChangeText={(text) => {
+                      setVolunteerNameOther(text);
+                      if (fieldErrors.volunteer) {
+                        setFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.volunteer;
+                          return n;
+                        });
+                      }
+                    }}
                     placeholder={isAr ? 'اكتب اسمك كمتطوع...' : 'Enter volunteer name...'}
                     placeholderTextColor={colors.textMuted}
                   />
+                ) : null}
+
+                {fieldErrors.volunteer ? (
+                  <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                    <AlertCircle size={13} color={colors.danger} />
+                    <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                      {fieldErrors.volunteer}
+                    </AppText>
+                  </View>
                 ) : null}
               </View>
 
@@ -597,10 +850,7 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                             borderRadius: borderRadius.full,
                           },
                         ]}
-                        onPress={() => {
-                          haptic.selection();
-                          setCallerType(type);
-                        }}
+                        onPress={() => handleSelectCallerType(type)}
                       >
                         <AppText
                           variant="caption"
@@ -615,23 +865,43 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                 </View>
 
                 {callerType === 'أخرى' || callerType === 'Other' ? (
-                  <TextInput
-                    style={[
-                      styles.textInput,
-                      {
-                        backgroundColor: colors.bgPrimary,
-                        borderColor: colors.cardBorder,
-                        color: colors.textPrimary,
-                        borderRadius: borderRadius.md,
-                        textAlign: isAr ? 'right' : 'left',
-                        marginTop: 8,
-                      },
-                    ]}
-                    value={callerTypeOther}
-                    onChangeText={setCallerTypeOther}
-                    placeholder={isAr ? 'حدد نوع المتصل الآخر...' : 'Specify other caller type...'}
-                    placeholderTextColor={colors.textMuted}
-                  />
+                  <View>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        fieldErrors.caller_type_other ? styles.inputError : null,
+                        {
+                          backgroundColor: colors.bgPrimary,
+                          borderColor: fieldErrors.caller_type_other ? colors.danger : colors.cardBorder,
+                          color: colors.textPrimary,
+                          borderRadius: borderRadius.md,
+                          textAlign: isAr ? 'right' : 'left',
+                          marginTop: 8,
+                        },
+                      ]}
+                      value={callerTypeOther}
+                      onChangeText={(text) => {
+                        setCallerTypeOther(text);
+                        if (fieldErrors.caller_type_other) {
+                          setFieldErrors((prev) => {
+                            const n = { ...prev };
+                            delete n.caller_type_other;
+                            return n;
+                          });
+                        }
+                      }}
+                      placeholder={isAr ? 'حدد نوع المتصل الآخر...' : 'Specify other caller type...'}
+                      placeholderTextColor={colors.textMuted}
+                    />
+                    {fieldErrors.caller_type_other ? (
+                      <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <AlertCircle size={13} color={colors.danger} />
+                        <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                          {fieldErrors.caller_type_other}
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
 
                 {/* Referral Source */}
@@ -652,10 +922,7 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                             borderRadius: borderRadius.full,
                           },
                         ]}
-                        onPress={() => {
-                          haptic.selection();
-                          setReferralSource(source);
-                        }}
+                        onPress={() => handleSelectReferralSource(source)}
                       >
                         <AppText
                           variant="caption"
@@ -670,23 +937,175 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                 </View>
 
                 {referralSource === 'أخرى' || referralSource === 'Other' ? (
-                  <TextInput
+                  <View>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        fieldErrors.referral_source_other ? styles.inputError : null,
+                        {
+                          backgroundColor: colors.bgPrimary,
+                          borderColor: fieldErrors.referral_source_other ? colors.danger : colors.cardBorder,
+                          color: colors.textPrimary,
+                          borderRadius: borderRadius.md,
+                          textAlign: isAr ? 'right' : 'left',
+                          marginTop: 8,
+                        },
+                      ]}
+                      value={referralSourceOther}
+                      onChangeText={(text) => {
+                        setReferralSourceOther(text);
+                        if (fieldErrors.referral_source_other) {
+                          setFieldErrors((prev) => {
+                            const n = { ...prev };
+                            delete n.referral_source_other;
+                            return n;
+                          });
+                        }
+                      }}
+                      placeholder={isAr ? 'حدد مصدر المعرفة الآخر...' : 'Specify other referral source...'}
+                      placeholderTextColor={colors.textMuted}
+                    />
+                    {fieldErrors.referral_source_other ? (
+                      <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <AlertCircle size={13} color={colors.danger} />
+                        <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                          {fieldErrors.referral_source_other}
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Conditional Field: Hospital Name (Rendered Inline) */}
+                {isHospitalRequired ? (
+                  <View
                     style={[
-                      styles.textInput,
+                      styles.conditionalFieldContainer,
                       {
-                        backgroundColor: colors.bgPrimary,
-                        borderColor: colors.cardBorder,
-                        color: colors.textPrimary,
-                        borderRadius: borderRadius.md,
-                        textAlign: isAr ? 'right' : 'left',
-                        marginTop: 8,
+                        backgroundColor: isDark ? 'rgba(34, 211, 238, 0.08)' : '#f0fdfa',
+                        borderColor: isDark ? '#0891b2' : '#99f6e4',
                       },
                     ]}
-                    value={referralSourceOther}
-                    onChangeText={setReferralSourceOther}
-                    placeholder={isAr ? 'حدد مصدر المعرفة الآخر...' : 'Specify other referral source...'}
-                    placeholderTextColor={colors.textMuted}
-                  />
+                  >
+                    <View style={[styles.labelWithBadgeRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                        <Building2 size={16} color={colors.accentDark} />
+                        <AppText variant="label" color={colors.textPrimary} weight="700">
+                          {isAr ? 'اسم المستشفى أو المركز العلاجي' : 'Hospital / Facility Name'}
+                        </AppText>
+                      </View>
+                      <Badge
+                        label={isAr ? 'مطلوب للجنة المستشفيات' : 'Required'}
+                        variant="accent"
+                        size="sm"
+                      />
+                    </View>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        fieldErrors.hospital_name ? styles.inputError : null,
+                        {
+                          backgroundColor: colors.bgPrimary,
+                          borderColor: fieldErrors.hospital_name ? colors.danger : colors.cardBorder,
+                          color: colors.textPrimary,
+                          borderRadius: borderRadius.md,
+                          textAlign: isAr ? 'right' : 'left',
+                          marginTop: 6,
+                        },
+                      ]}
+                      value={hospitalName}
+                      onChangeText={(text) => {
+                        setHospitalName(text);
+                        if (fieldErrors.hospital_name) {
+                          setFieldErrors((prev) => {
+                            const n = { ...prev };
+                            delete n.hospital_name;
+                            return n;
+                          });
+                        }
+                      }}
+                      placeholder={
+                        isAr
+                          ? 'اكتب اسم المستشفى أو المؤسسة العلاجية...'
+                          : 'Enter hospital or medical facility name...'
+                      }
+                      placeholderTextColor={colors.textMuted}
+                    />
+                    {fieldErrors.hospital_name ? (
+                      <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <AlertCircle size={13} color={colors.danger} />
+                        <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                          {fieldErrors.hospital_name}
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Conditional Field: Poster Location (Rendered Inline) */}
+                {isPosterLocationRequired ? (
+                  <View
+                    style={[
+                      styles.conditionalFieldContainer,
+                      {
+                        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.08)' : '#f0f9ff',
+                        borderColor: isDark ? '#0284c7' : '#bae6fd',
+                      },
+                    ]}
+                  >
+                    <View style={[styles.labelWithBadgeRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                      <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                        <MapPin size={16} color={colors.primary} />
+                        <AppText variant="label" color={colors.textPrimary} weight="700">
+                          {isAr ? 'مكان الملصق / العنوان بالتفصيل' : 'Poster Location / Address'}
+                        </AppText>
+                      </View>
+                      <Badge
+                        label={isAr ? 'مطلوب للملصقات' : 'Required'}
+                        variant="primary"
+                        size="sm"
+                      />
+                    </View>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        fieldErrors.poster_location ? styles.inputError : null,
+                        {
+                          backgroundColor: colors.bgPrimary,
+                          borderColor: fieldErrors.poster_location ? colors.danger : colors.cardBorder,
+                          color: colors.textPrimary,
+                          borderRadius: borderRadius.md,
+                          textAlign: isAr ? 'right' : 'left',
+                          marginTop: 6,
+                        },
+                      ]}
+                      value={posterLocation}
+                      onChangeText={(text) => {
+                        setPosterLocation(text);
+                        if (fieldErrors.poster_location) {
+                          setFieldErrors((prev) => {
+                            const n = { ...prev };
+                            delete n.poster_location;
+                            return n;
+                          });
+                        }
+                      }}
+                      placeholder={
+                        isAr
+                          ? 'مثال: محطة مترو الشهداء، شارع التحرير، المركز الصحي...'
+                          : 'e.g. Metro station, street, clinic...'
+                      }
+                      placeholderTextColor={colors.textMuted}
+                    />
+                    {fieldErrors.poster_location ? (
+                      <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                        <AlertCircle size={13} color={colors.danger} />
+                        <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                          {fieldErrors.poster_location}
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
 
@@ -745,33 +1164,72 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
                   </TouchableOpacity>
                 </View>
 
-                {/* Call Brief (Required) */}
-                <AppText variant="label" color={colors.textSecondary} style={[styles.inputLabel, { marginTop: 14 }]}>
-                  {isAr ? 'ملخص المكالمة (مطلوب)' : 'Call Brief (Required)'}
-                </AppText>
+                {/* Call Brief (Dynamically Optional for 'عضو حالي', Required otherwise) */}
+                <View style={[styles.labelWithBadgeRow, { flexDirection: isAr ? 'row-reverse' : 'row', marginTop: 14 }]}>
+                  <AppText variant="label" color={colors.textSecondary}>
+                    {isCallBriefOptional
+                      ? (isAr ? 'ملخص المكالمة (اختياري لعضو حالي)' : 'Call Brief (Optional for current member)')
+                      : (isAr ? 'ملخص المكالمة (مطلوب)' : 'Call Brief (Required)')}
+                  </AppText>
+                  {isCallBriefOptional ? (
+                    <Badge
+                      label={isAr ? 'اختياري' : 'Optional'}
+                      variant="outline"
+                      size="sm"
+                    />
+                  ) : (
+                    <Badge
+                      label={isAr ? 'مطلوب' : 'Required'}
+                      variant="accent"
+                      size="sm"
+                    />
+                  )}
+                </View>
                 <TextInput
                   style={[
                     styles.textArea,
+                    fieldErrors.call_brief ? styles.inputError : null,
                     {
                       backgroundColor: colors.bgPrimary,
-                      borderColor: colors.cardBorder,
+                      borderColor: fieldErrors.call_brief ? colors.danger : colors.cardBorder,
                       color: colors.textPrimary,
                       borderRadius: borderRadius.md,
                       textAlign: isAr ? 'right' : 'left',
                     },
                   ]}
                   value={callBrief}
-                  onChangeText={setCallBrief}
+                  onChangeText={(text) => {
+                    setCallBrief(text);
+                    if (fieldErrors.call_brief) {
+                      setFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.call_brief;
+                        return n;
+                      });
+                    }
+                  }}
                   placeholder={
-                    isAr
-                      ? 'اكتب ملخصاً موجزاً عما دار في المكالمة وما تم توجيه المتصل إليه...'
-                      : 'Summarize the call discussion and guidance provided...'
+                    isCallBriefOptional
+                      ? (isAr
+                          ? 'اختياري: يمكنك كتابة أي استفسار أو ملخص إذا تطلب الأمر...'
+                          : 'Optional: You may enter any notes or inquiry details...')
+                      : (isAr
+                          ? 'اكتب ملخصاً موجزاً عما دار في المكالمة وما تم توجيه المتصل إليه...'
+                          : 'Summarize the call discussion and guidance provided...')
                   }
                   placeholderTextColor={colors.textMuted}
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
                 />
+                {fieldErrors.call_brief ? (
+                  <View style={[styles.errorRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                    <AlertCircle size={13} color={colors.danger} />
+                    <AppText variant="caption" color={colors.danger} style={{ marginHorizontal: 4 }}>
+                      {fieldErrors.call_brief}
+                    </AppText>
+                  </View>
+                ) : null}
 
                 {/* Discuss in Committee Meeting Toggle */}
                 <View style={[styles.toggleRow, { flexDirection: isAr ? 'row-reverse' : 'row', marginTop: 14 }]}>
@@ -909,11 +1367,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 6,
   },
+  labelWithBadgeRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  conditionalFieldContainer: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+  },
   textInput: {
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+  },
+  inputError: {
+    borderWidth: 1.5,
+  },
+  errorRow: {
+    alignItems: 'center',
+    marginTop: 4,
   },
   textArea: {
     borderWidth: 1,

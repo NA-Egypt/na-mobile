@@ -168,6 +168,19 @@ async function runAllApiTests() {
   await testEndpoint('Service Committees', '/service-committees');
   await testEndpoint('Service Committee Meetings', '/sc-meetings');
 
+  // 7. Helpline Form Dynamic Schema
+  await testEndpoint('Helpline Form Schema', '/helpline-calls/schema', (body) => {
+    const data = body?.data || body;
+    const hasShifts = Array.isArray(data?.shifts);
+    const hasCallers = Array.isArray(data?.caller_types);
+    const hasReferrals = Array.isArray(data?.referral_sources);
+    const hasConditionals = !!data?.conditional_fields;
+    return {
+      valid: hasShifts && hasCallers && hasReferrals,
+      notes: `Shifts: ${data?.shifts?.length || 0}, Callers: ${data?.caller_types?.length || 0}, Referrals: ${data?.referral_sources?.length || 0}, Dynamic Conditionals: ${hasConditionals ? 'YES' : 'NO'}`,
+    };
+  });
+
   // Print Summary Table
   console.log(`\n======================================================`);
   console.log(`📊 API TEST SUMMARY RESULTS`);

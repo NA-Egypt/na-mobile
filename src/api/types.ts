@@ -538,6 +538,13 @@ export interface HelplineDurationOption {
   label: string;
 }
 
+export interface HelplineConditionalRule {
+  rule: 'required_if' | 'optional_if' | string;
+  field: string;
+  value: string;
+  description?: string;
+}
+
 export interface HelplineSchemaResponse {
   title: string;
   locale: string;
@@ -547,6 +554,7 @@ export interface HelplineSchemaResponse {
   durations: HelplineDurationOption[];
   volunteers: HelplineVolunteerItem[];
   fields_order?: string[];
+  conditional_fields?: Record<string, HelplineConditionalRule>;
 }
 
 export interface HelplineCallPayload {
@@ -557,10 +565,12 @@ export interface HelplineCallPayload {
   caller_type_other?: string | null;
   referral_source: string;
   referral_source_other?: string | null;
+  hospital_name?: string | null;
+  poster_location?: string | null;
   volunteer_name: string;
   volunteer_name_other?: string | null;
   is_step_12: boolean;
-  call_brief: string;
+  call_brief?: string | null;
   discuss_in_meeting: boolean;
   additional_info?: string | null;
 }
@@ -577,12 +587,14 @@ export interface HelplineCallResponse {
   referral_source: string;
   referral_source_other?: string | null;
   effective_referral_source?: string;
+  hospital_name?: string | null;
+  poster_location?: string | null;
   volunteer_id?: number | null;
   volunteer_name: string;
   volunteer_name_other?: string | null;
   effective_volunteer_name?: string;
   is_step_12: boolean;
-  call_brief: string;
+  call_brief?: string | null;
   discuss_in_meeting: boolean;
   additional_info?: string | null;
   entry_time?: string;
