@@ -86,6 +86,68 @@ function cleanHtmlText(text?: string | null): string {
     .trim();
 }
 
+function extractUserServiceBodyId(u?: UserProfile | null): number | null {
+  if (!u) return null;
+  if (u.service_body_id != null && !isNaN(Number(u.service_body_id))) {
+    const id = Number(u.service_body_id);
+    if (id > 0) return id;
+  }
+  if ((u as any).service_body?.id != null && !isNaN(Number((u as any).service_body.id))) {
+    const id = Number((u as any).service_body.id);
+    if (id > 0) return id;
+  }
+  if ((u as any).serviceBodyId != null && !isNaN(Number((u as any).serviceBodyId))) {
+    const id = Number((u as any).serviceBodyId);
+    if (id > 0) return id;
+  }
+  return null;
+}
+
+function getUserRoleStrings(u?: UserProfile | null): string[] {
+  if (!u || !Array.isArray(u.roles)) return [];
+  return u.roles.map((r: any) =>
+    (typeof r === 'string' ? r : r.name || r.slug || '').toLowerCase().trim()
+  );
+}
+
+function checkIsServiceBodyServant(u?: UserProfile | null): boolean {
+  if (!u) return false;
+  const sbId = extractUserServiceBodyId(u);
+  if (sbId != null && sbId > 0) return true;
+  const roles = getUserRoleStrings(u);
+  return roles.some(
+    (r) =>
+      r.includes('servicebody') ||
+      r.includes('service_body') ||
+      r.includes('service body') ||
+      r.includes('منطقة') ||
+      r.includes('منتدى')
+  );
+}
+
+function checkIsSuperAdminOrRsc(u?: UserProfile | null): boolean {
+  if (!u) return false;
+  // Service Body scoping strictly takes precedence if user has assigned service body or service body role
+  if (checkIsServiceBodyServant(u)) {
+    return false;
+  }
+  const roles = getUserRoleStrings(u);
+  const email = (u.email || '').toLowerCase().trim();
+  const isExplicitSuperAdmin = roles.some(
+    (r) =>
+      r === 'super admin' ||
+      r === 'super_admin' ||
+      r === 'super-admin' ||
+      r === 'superadmin' ||
+      r === 'admin'
+  );
+  const isExplicitRsc = roles.some(
+    (r) => r === 'rsc' || r === 'regional service committee' || r.includes('rsc')
+  );
+  const hasGlobalAdminEmail = email.startsWith('superadmin@') || email.startsWith('rsc@');
+  return isExplicitSuperAdmin || isExplicitRsc || hasGlobalAdminEmail;
+}
+
 export default function AgendasScreen() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
@@ -149,12 +211,25 @@ export default function AgendasScreen() {
     setIsOfflineError(false);
     setTabForbidden({ groups: false, service_bodies: false, committees_archive: false });
 
+    const activeSbId = extractUserServiceBodyId(activeUser);
+    const isActiveSbServant = checkIsServiceBodyServant(activeUser);
+
+    const groupFilters: any = { per_page: 100 };
+    const agendaFilters: any = { per_page: 100 };
+    const sbAgendaFilters: any = { per_page: 100 };
+
+    if (isActiveSbServant && activeSbId) {
+      groupFilters.service_body_id = activeSbId;
+      agendaFilters.service_body_id = activeSbId;
+      sbAgendaFilters.service_body_id = activeSbId;
+    }
+
     try {
       const [agendasRes, sbRes, reportsRes, groupsRes, sbListRes] = await Promise.allSettled([
-        apiClient.get('/agendas', { params: { per_page: 100 } }),
-        apiClient.get('/service-body-agendas', { params: { per_page: 100 } }),
+        apiClient.get('/agendas', { params: agendaFilters }),
+        apiClient.get('/service-body-agendas', { params: sbAgendaFilters }),
         apiClient.get('/committee-reports', { params: { per_page: 100 } }),
-        groupsApi.getGroups({ per_page: 100 }),
+        groupsApi.getGroups(groupFilters),
         lookupsApi.getServiceBodies(),
       ]);
 
@@ -167,27 +242,39 @@ export default function AgendasScreen() {
             : [];
         const gMap: Record<number, Group> = {};
         if (gList.length > 0) {
-          setAllGroups(gList);
-          gList.forEach((g) => {
+          // If active user is a service body servant, strictly enforce service_body_id check
+          const filteredGList = (isActiveSbServant && activeSbId)
+            ? gList.filter((g) => {
+                const sId = Number(g.service_body_id || g.service_body?.id);
+                return sId === activeSbId;
+              })
+            : gList;
+          setAllGroups(filteredGList);
+          filteredGList.forEach((g) => {
             if (g.id) gMap[Number(g.id)] = g;
           });
+        } else {
+          setAllGroups([]);
         }
-        // Augment groupsMap with local WatermelonDB groups cache
-        try {
-          const localGroups = await database.get<GroupModel>('groups').query().fetch();
-          localGroups.forEach((lg) => {
-            const idNum = Number(lg.remoteId);
-            if (idNum && !gMap[idNum]) {
-              gMap[idNum] = {
-                id: idNum,
-                ar_name: lg.name || '',
-                en_name: lg.name || '',
-                group_type: lg.groupType,
-              } as any;
-            }
-          });
-        } catch (dbErr) {
-          // Ignore local db query error
+        // Augment groupsMap with local WatermelonDB groups cache only for global servants
+        // to prevent leaking unassigned local groups into a service body view
+        if (!isActiveSbServant || !activeSbId) {
+          try {
+            const localGroups = await database.get<GroupModel>('groups').query().fetch();
+            localGroups.forEach((lg) => {
+              const idNum = Number(lg.remoteId);
+              if (idNum && !gMap[idNum]) {
+                gMap[idNum] = {
+                  id: idNum,
+                  ar_name: lg.name || '',
+                  en_name: lg.name || '',
+                  group_type: lg.groupType,
+                } as any;
+              }
+            });
+          } catch (dbErr) {
+            // Ignore local db query error
+          }
         }
         setGroupsMap(gMap);
       }
@@ -371,31 +458,13 @@ export default function AgendasScreen() {
     }
   };
 
-  const userRoles = Array.isArray(user?.roles)
-    ? user.roles.map((r: any) =>
-        (typeof r === 'string' ? r : r.name || r.slug || '').toLowerCase()
-      )
-    : [];
+  const userRoles = getUserRoleStrings(user);
+  const userEmail = (user?.email || '').toLowerCase().trim();
 
-  const userEmail = (user?.email || '').toLowerCase();
+  const isServiceBodyServant = checkIsServiceBodyServant(user);
+  const userServiceBodyId = extractUserServiceBodyId(user);
+  const isSuperAdminOrRsc = checkIsSuperAdminOrRsc(user);
 
-  // Super Admin / RSC check: full access across fellowship
-  const isSuperAdminOrRsc = Boolean(
-    userRoles.some(
-      (r) =>
-        r.includes('super admin') ||
-        r.includes('super_admin') ||
-        r.includes('rsc') ||
-        r.includes('admin')
-    ) ||
-    userEmail.includes('admin@') ||
-    userEmail.includes('rsc@')
-  );
-
-  // Service Body assignment
-  const userServiceBodyId =
-    user?.service_body_id != null ? Number(user.service_body_id) : null;
-  const isServiceBodyServant = !isSuperAdminOrRsc && Boolean(userServiceBodyId);
   const userSbObj = userServiceBodyId ? serviceBodiesMap[userServiceBodyId] : null;
   const servantAreaName = userSbObj
     ? ((isAr ? userSbObj.ar_name : userSbObj.en_name) ||
@@ -412,24 +481,26 @@ export default function AgendasScreen() {
   const directUserGroupId = (user as any)?.group_id || (user as any)?.group?.id;
 
   // Strategy 2: Multi-strategy matching in allGroups (by ID, email, name)
-  const userAssociatedGroup = allGroups.find((g) => {
-    if (directUserGroupId && Number(g.id) === Number(directUserGroupId)) return true;
-    if (user?.id && (g.user?.id === user.id || (g as any).user_id === user.id)) return true;
-    if (user?.email) {
-      const uEmail = user.email.toLowerCase();
-      const gEmail = (g as any).email?.toLowerCase();
-      if (gEmail && uEmail === gEmail) return true;
-      const cleanEn = (g.en_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanEn && uEmail.includes(cleanEn)) return true;
-    }
-    if (user?.name) {
-      const uName = user.name.trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
-      const gAr = (g.ar_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
-      const gEn = (g.en_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
-      if (uName && (uName === gAr || uName === gEn)) return true;
-    }
-    return false;
-  });
+  const userAssociatedGroup = (!isServiceBodyServant && !isSuperAdminOrRsc)
+    ? allGroups.find((g) => {
+        if (directUserGroupId && Number(g.id) === Number(directUserGroupId)) return true;
+        if (user?.id && (g.user?.id === user.id || (g as any).user_id === user.id)) return true;
+        if (user?.email) {
+          const uEmail = user.email.toLowerCase();
+          const gEmail = (g as any).email?.toLowerCase();
+          if (gEmail && uEmail === gEmail) return true;
+          const cleanEn = (g.en_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanEn && uEmail.includes(cleanEn)) return true;
+        }
+        if (user?.name) {
+          const uName = user.name.trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+          const gAr = (g.ar_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+          const gEn = (g.en_name || '').trim().toLowerCase().replace(/^(مجموعة|group)\s+/i, '');
+          if (uName && (uName === gAr || uName === gEn)) return true;
+        }
+        return false;
+      })
+    : undefined;
 
   const targetGroupId = directUserGroupId || userAssociatedGroup?.id;
 
@@ -466,27 +537,32 @@ export default function AgendasScreen() {
         }
         return false;
       })
-    : isServiceBodyServant && userServiceBodyId
-      ? groupAgendas.filter((a) => {
-          const groupObj =
-            a.group ||
-            groupsMap[Number(a.group_id)] ||
-            groupsMap[a.group_id];
-          const agendaSbId = Number(
-            a.service_body_id ||
-            groupObj?.service_body_id ||
-            groupObj?.service_body?.id ||
-            a.group?.service_body_id
-          );
-          return agendaSbId === userServiceBodyId;
-        })
+    : isServiceBodyServant
+      ? userServiceBodyId
+        ? groupAgendas.filter((a) => {
+            const groupObj =
+              a.group ||
+              groupsMap[Number(a.group_id)] ||
+              groupsMap[a.group_id];
+            const groupSbId = Number(
+              groupObj?.service_body_id ||
+              groupObj?.service_body?.id ||
+              a.group?.service_body_id ||
+              a.group?.service_body?.id
+            );
+            const directSbId = a.service_body_id ? Number(a.service_body_id) : null;
+            if (groupSbId && groupSbId === userServiceBodyId) return true;
+            if (directSbId && directSbId === userServiceBodyId) return true;
+            return false;
+          })
+        : [] // If service body servant has no valid service body ID, strictly show 0 agendas
       : groupAgendas;
 
   // Strict role filtering for Service Bodies tab:
   // Service body servants strictly see only their own service body's agendas
   // Super Admin / RSC and GSRs see all service body agendas
-  const filteredServiceBodyAgendas =
-    isServiceBodyServant && userServiceBodyId
+  const filteredServiceBodyAgendas = isServiceBodyServant
+    ? userServiceBodyId
       ? serviceBodyAgendas.filter((sbAgenda) => {
           const agendaSbId = Number(
             sbAgenda.service_body_id ||
@@ -494,13 +570,18 @@ export default function AgendasScreen() {
           );
           return agendaSbId === userServiceBodyId;
         })
-      : serviceBodyAgendas;
+      : []
+    : serviceBodyAgendas;
 
-  // Group selector for submit modal: restricted to area groups for Service Body servants
-  const availableGroupsForSubmit =
-    isServiceBodyServant && userServiceBodyId
-      ? allGroups.filter((g) => Number(g.service_body_id) === userServiceBodyId)
-      : allGroups;
+  // Group selector for submit modal: restricted strictly to area groups for Service Body servants
+  const availableGroupsForSubmit = isServiceBodyServant
+    ? userServiceBodyId
+      ? allGroups.filter((g) => {
+          const gSbId = Number(g.service_body_id || g.service_body?.id);
+          return gSbId === userServiceBodyId;
+        })
+      : []
+    : allGroups;
 
   const currentList = (
     activeTab === 'groups'
@@ -912,6 +993,37 @@ export default function AgendasScreen() {
                       icon={<Plus size={15} color="#ffffff" />}
                     />
                   </View>
+                ) : isServiceBodyServant && !userServiceBodyId ? (
+                  <View
+                    style={[
+                      styles.nonGroupServantBanner,
+                      {
+                        backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                        borderColor: colors.danger,
+                        borderRadius: borderRadius.md,
+                        flexDirection: isAr ? 'row-reverse' : 'row',
+                        padding: 14,
+                      },
+                    ]}
+                  >
+                    <ShieldAlert size={20} color={colors.danger} style={{ marginHorizontal: 6 }} />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="body" color={colors.textPrimary} weight="700">
+                        {isAr
+                          ? 'حساب هيئة خدمة غير مرتبط بمنطقة'
+                          : 'Service Body Unassigned'}
+                      </AppText>
+                      <AppText
+                        variant="caption"
+                        color={colors.textSecondary}
+                        style={{ marginTop: 4, lineHeight: 18, textAlign: isAr ? 'right' : 'left' }}
+                      >
+                        {isAr
+                          ? 'تم تسجيل دخولك كخادم هيئة خدمة، ولكن لم يتم ربط حسابك بمنطقة خدمية محددة. يرجى التواصل مع مسؤول الخدمة (RSC / Admin) لتعيين منطقتك.'
+                          : 'You are signed in with a Service Body role, but no specific service body has been assigned to your account. Please contact RSC/Admin to link your service body.'}
+                      </AppText>
+                    </View>
+                  </View>
                 ) : isServiceBodyServant ? (
                   <View
                     style={[
@@ -1269,25 +1381,37 @@ export default function AgendasScreen() {
                 title={
                   activeTab === 'groups' && isGroupUser
                     ? (isAr ? 'لا توجد جداول أعمال مسجلة لمجموعتك بعد' : 'No agendas recorded for your group yet')
-                    : activeTab === 'groups' && isServiceBodyServant
-                      ? (isAr
-                          ? `لا توجد جداول أعمال مسجلة لمجموعات ${servantAreaName || 'منطقتك'} بعد`
-                          : `No agendas recorded for groups in ${servantAreaName || 'your area'} yet`)
-                      : activeTab === 'service_bodies' && isServiceBodyServant
+                    : activeTab === 'groups' && isServiceBodyServant && !userServiceBodyId
+                      ? (isAr ? 'لم يتم تعيين منطقة خدمية لحسابك' : 'No Service Body assigned to your account')
+                      : activeTab === 'groups' && isServiceBodyServant
                         ? (isAr
-                            ? `لا توجد جداول أعمال مسجلة لـ ${servantAreaName || 'منطقتك'} بعد`
-                            : `No agendas recorded for ${servantAreaName || 'your service body'} yet`)
-                        : (isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section')
+                            ? `لا توجد جداول أعمال مسجلة لمجموعات ${servantAreaName || 'منطقتك'} بعد`
+                            : `No agendas recorded for groups in ${servantAreaName || 'your area'} yet`)
+                        : activeTab === 'service_bodies' && isServiceBodyServant && !userServiceBodyId
+                          ? (isAr ? 'لم يتم تعيين منطقة خدمية لحسابك' : 'No Service Body assigned to your account')
+                          : activeTab === 'service_bodies' && isServiceBodyServant
+                            ? (isAr
+                                ? `لا توجد جداول أعمال مسجلة لـ ${servantAreaName || 'منطقتك'} بعد`
+                                : `No agendas recorded for ${servantAreaName || 'your service body'} yet`)
+                            : (isAr ? 'لا توجد سجلات مسجلة في هذا القسم' : 'No records found in this section')
                 }
                 description={
                   activeTab === 'groups' && isGroupUser
                     ? (isAr
                         ? 'يمكنك تقديم تقرير جدول أعمال جديد لمجموعتك من خلال زر "تقديم أجندة جديدة" أعلاه.'
                         : 'You can submit a new business agenda report for your group using the button above.')
-                    : activeTab === 'groups' && isServiceBodyServant
+                    : activeTab === 'groups' && isServiceBodyServant && !userServiceBodyId
                       ? (isAr
-                          ? 'يتم هنا حصر ومتابعة جداول أعمال وتقارير المجموعات التابعة لمنطقتك الخدمية فقط.'
-                          : 'Only business agendas submitted by groups belonging to your service body are shown here.')
+                          ? 'حسابك مسجل كخادم هيئة خدمة، ولكن لم يتم ربط منطقتك الخدمية في بيانات الحساب.'
+                          : 'Your account has a Service Body role, but no service body is currently assigned.')
+                      : activeTab === 'groups' && isServiceBodyServant
+                        ? (isAr
+                            ? 'يتم هنا حصر ومتابعة جداول أعمال وتقارير المجموعات التابعة لمنطقتك الخدمية فقط.'
+                            : 'Only business agendas submitted by groups belonging to your service body are shown here.')
+                      : activeTab === 'service_bodies' && isServiceBodyServant && !userServiceBodyId
+                        ? (isAr
+                            ? 'يرجى مراجعة مسؤول الخدمة لتعيين المنطقة الخدمية لحسابك.'
+                            : 'Please contact the administrator to assign your service body.')
                       : activeTab === 'service_bodies' && isServiceBodyServant
                         ? (isAr
                             ? 'يتم عرض جداول أعمال ومحاضر اجتماعات هيئة الخدمة الخاصة بمنطقتك فقط.'
@@ -1722,7 +1846,7 @@ export default function AgendasScreen() {
           setIsSubmitModalVisible(false);
           fetchAllData();
         }}
-        userGroup={userAssociatedGroup}
+        userGroup={isGroupUser ? userAssociatedGroup : undefined}
         availableGroups={availableGroupsForSubmit}
         defaultSubmitterName={user?.name}
       />

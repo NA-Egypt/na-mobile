@@ -11,10 +11,17 @@ import {
 export const agendasApi = {
   // --- Group Agendas ---
   /**
-   * Retrieves all group agendas.
+   * Retrieves all group agendas with optional query filters.
    */
-  async getGroupAgendas(): Promise<GroupAgenda[]> {
-    const response = await apiClient.get<ApiResponse<GroupAgenda[]> | GroupAgenda[]>('/agendas');
+  async getGroupAgendas(filters?: {
+    service_body_id?: number;
+    group_id?: number;
+    per_page?: number;
+    page?: number;
+  }): Promise<GroupAgenda[]> {
+    const response = await apiClient.get<ApiResponse<GroupAgenda[]> | GroupAgenda[]>('/agendas', {
+      params: filters,
+    });
     if (Array.isArray(response.data)) {
       return response.data;
     }
@@ -63,11 +70,16 @@ export const agendasApi = {
 
   // --- Service Body Agendas ---
   /**
-   * Retrieves available service body agendas (filtered by role on backend).
+   * Retrieves available service body agendas (filtered by role and optional service_body_id).
    */
-  async getServiceBodyAgendas(): Promise<ServiceBodyAgenda[]> {
+  async getServiceBodyAgendas(filters?: {
+    service_body_id?: number;
+    per_page?: number;
+    page?: number;
+  }): Promise<ServiceBodyAgenda[]> {
     const response = await apiClient.get<ApiResponse<ServiceBodyAgenda[]> | ServiceBodyAgenda[]>(
-      '/service-body-agendas'
+      '/service-body-agendas',
+      { params: filters }
     );
     if (Array.isArray(response.data)) {
       return response.data;

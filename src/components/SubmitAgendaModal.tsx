@@ -86,8 +86,13 @@ export const SubmitAgendaModal: React.FC<SubmitAgendaModalProps> = ({
     if (visible) {
       if (userGroup?.id) {
         setSelectedGroupId(userGroup.id);
-      } else if (availableGroups.length > 0 && !selectedGroupId) {
-        setSelectedGroupId(availableGroups[0].id);
+      } else if (availableGroups.length > 0) {
+        const isCurrentInAvailable = availableGroups.some((g) => g.id === selectedGroupId);
+        if (!selectedGroupId || !isCurrentInAvailable) {
+          setSelectedGroupId(availableGroups[0].id);
+        }
+      } else {
+        setSelectedGroupId(0);
       }
       if (defaultSubmitterName && !submitterName) {
         setSubmitterName(defaultSubmitterName);
@@ -244,7 +249,7 @@ export const SubmitAgendaModal: React.FC<SubmitAgendaModalProps> = ({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Group Identification Card */}
+            {/* Group Identification Card / Selector */}
             <View
               style={[
                 styles.groupBanner,
@@ -256,22 +261,94 @@ export const SubmitAgendaModal: React.FC<SubmitAgendaModalProps> = ({
                 },
               ]}
             >
-              <View style={[styles.groupBannerRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
-                <Building2 size={20} color={colors.primary} />
-                <View style={{ marginHorizontal: 8, flex: 1 }}>
-                  <AppText variant="caption" color={colors.textSecondary}>
-                    {isAr ? 'المجموعة المسجل بها الخادم' : 'Assigned Servant Group'}
-                  </AppText>
-                  <AppText variant="h4" color={colors.textPrimary} weight="700">
-                    {groupDisplayName}
-                  </AppText>
+              {userGroup ? (
+                <View style={[styles.groupBannerRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <Building2 size={20} color={colors.primary} />
+                  <View style={{ marginHorizontal: 8, flex: 1 }}>
+                    <AppText variant="caption" color={colors.textSecondary}>
+                      {isAr ? 'المجموعة المسجل بها الخادم' : 'Assigned Servant Group'}
+                    </AppText>
+                    <AppText variant="h4" color={colors.textPrimary} weight="700">
+                      {groupDisplayName}
+                    </AppText>
+                  </View>
+                  <Badge
+                    label={isAr ? 'خادم معتمد' : 'GSR Verified'}
+                    variant="success"
+                    size="sm"
+                  />
                 </View>
-                <Badge
-                  label={isAr ? 'خادم معتمد' : 'GSR Verified'}
-                  variant="success"
-                  size="sm"
-                />
-              </View>
+              ) : availableGroups.length > 0 ? (
+                <View>
+                  <View style={[styles.groupBannerRow, { flexDirection: isAr ? 'row-reverse' : 'row', marginBottom: 10 }]}>
+                    <Building2 size={20} color={colors.primary} />
+                    <View style={{ marginHorizontal: 8, flex: 1 }}>
+                      <AppText variant="caption" color={colors.textSecondary}>
+                        {isAr ? 'مجموعة المنطقة المحددة للتقرير' : 'Selected Area Group for Agenda'}
+                      </AppText>
+                      <AppText variant="h4" color={colors.textPrimary} weight="700">
+                        {groupDisplayName}
+                      </AppText>
+                    </View>
+                    <Badge
+                      label={isAr ? `${availableGroups.length} مجموعات بالمنطقة` : `${availableGroups.length} Area Groups`}
+                      variant="accent"
+                      size="sm"
+                    />
+                  </View>
+
+                  <AppText variant="label" color={colors.textSecondary} style={{ marginBottom: 8, textAlign: isAr ? 'right' : 'left' }}>
+                    {isAr ? 'اختر مجموعة من مجموعات منطقتك:' : 'Select group from your area:'}
+                  </AppText>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, paddingVertical: 4, flexDirection: isAr ? 'row-reverse' : 'row' }}
+                  >
+                    {availableGroups.map((g) => {
+                      const isSelected = g.id === selectedGroupId;
+                      const gName = (isAr ? g.ar_name : g.en_name) || g.ar_name || g.en_name || `Group #${g.id}`;
+                      return (
+                        <TouchableOpacity
+                          key={g.id}
+                          onPress={() => {
+                            haptic.selection();
+                            setSelectedGroupId(g.id);
+                          }}
+                          style={{
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: borderRadius.md,
+                            backgroundColor: isSelected ? colors.primary : colors.bgPrimary,
+                            borderWidth: 1,
+                            borderColor: isSelected ? colors.primary : colors.cardBorder,
+                          }}
+                        >
+                          <AppText
+                            variant="caption"
+                            weight={isSelected ? '700' : '500'}
+                            color={isSelected ? '#ffffff' : colors.textPrimary}
+                          >
+                            {gName}
+                          </AppText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : (
+                <View style={[styles.groupBannerRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+                  <Building2 size={20} color={colors.danger} />
+                  <View style={{ marginHorizontal: 8, flex: 1 }}>
+                    <AppText variant="body" color={colors.danger} weight="700">
+                      {isAr ? 'لا توجد مجموعات مسجلة في منطقتك' : 'No Groups Registered in Area'}
+                    </AppText>
+                    <AppText variant="caption" color={colors.textSecondary}>
+                      {isAr ? 'لم يتم العثور على مجموعات تابعة لمنطقتك الخدمية لتقديم أجندة لها.' : 'No member groups found in your service body.'}
+                    </AppText>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Section 1: Submitter & Position */}
