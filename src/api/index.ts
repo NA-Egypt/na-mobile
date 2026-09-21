@@ -13,3 +13,4 @@ export * from './transactions';
 export * from './newsletter';
 export * from './users';
 export * from './helpline';
+export * from './changeRequests';

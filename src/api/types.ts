@@ -367,6 +367,35 @@ export interface ContactRequest {
   updated_at?: string;
 }
 
+// IT & Data Change Requests
+export type ChangeRequestType = 'meetings_groups' | 'committee_info' | 'general' | 'other';
+export type ChangeRequestStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
+
+export interface ChangeRequest {
+  id: number;
+  user_id?: number;
+  user?: UserProfile;
+  request_type: ChangeRequestType;
+  subject: string;
+  description: string;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  status: ChangeRequestStatus;
+  admin_notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateChangeRequestPayload {
+  request_type: ChangeRequestType;
+  subject: string;
+  description: string;
+  attachment_name?: string | null;
+  attachment_uri?: string | null;
+  attachment_type?: string | null;
+  submitted_at?: string;
+}
+
 // Financial Transactions
 export interface Transaction {
   id: number;
