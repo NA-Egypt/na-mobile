@@ -42,7 +42,7 @@ export const JftModal: React.FC<JftModalProps> = ({ visible, onClose }) => {
   const fetchJft = async () => {
     setLoading(true);
     try {
-      const data = await homeApi.getJft();
+      const data = await homeApi.getJft(undefined, isAr ? 'ar' : 'en');
       if (data && (data.title || data.quote || data.thought_for_the_day)) {
         setJft(data);
       } else {

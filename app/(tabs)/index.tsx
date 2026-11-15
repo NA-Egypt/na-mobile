@@ -24,15 +24,17 @@ import {
   ArrowUpRight,
   HeartHandshake,
   Navigation,
+  Star,
 } from 'lucide-react-native';
 import { AppText, Badge, AppHeader } from '../../src/components/ui';
 import { JftModal } from '../../src/components/JftModal';
 import { HelplineModal } from '../../src/components/HelplineModal';
 import { HelplineCallLoggerModal } from '../../src/components/HelplineCallLoggerModal';
 import { homeApi } from '../../src/api/home';
-import { FrontpageStats, JftData, HelplineItem } from '../../src/api/types';
+import { FrontpageStats, JftData, HelplineItem, CalendarEvent } from '../../src/api/types';
 import { useAppTheme } from '../../src/theme';
 import { haptic } from '../../src/utils/haptics';
+import { formatWhatsAppUrl, formatDialerNumber } from '../../src/utils/phone';
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
@@ -85,24 +87,32 @@ export default function HomeScreen() {
     quote_source: 'الكتاب الأساسي لزمالة المدمنين المجهولين',
   });
 
+  const [heroEvent, setHeroEvent] = useState<CalendarEvent | null>(null);
+
   const OFFICIAL_DEFAULT_HELPLINES: HelplineItem[] = [
     {
-      region: 'Cairo & Giza',
-      region_ar: 'القاهرة والجيزة',
+      region: 'Egypt Region (General)',
+      region_ar: 'إقليم مصر (عام)',
       phones: ['+201006979198', '+201060933888'],
-      whatsapp: '+201060933888',
+      whatsapp: 'https://wa.me/201060933888',
+      hours: '10 AM - 12 Midnight',
+      hours_ar: '١٠ ص - ١٢ منتصف الليل',
     },
     {
       region: 'Alexandria',
       region_ar: 'الإسكندرية',
       phones: ['+201503884411'],
-      whatsapp: '+201503884411',
+      whatsapp: 'https://wa.me/201503884411',
+      hours: '12 PM - 10 PM',
+      hours_ar: '١٢ م - ١٠ م',
     },
     {
-      region: 'Al Ahram',
+      region: 'Al-Ahram Area',
       region_ar: 'الأهرام',
       phones: ['+201003694690'],
-      whatsapp: '+201003694690',
+      whatsapp: 'https://wa.me/201003694690',
+      hours: '12 PM - 10 PM',
+      hours_ar: '١٢ م - ١٠ م',
     },
   ];
 
@@ -110,14 +120,12 @@ export default function HomeScreen() {
 
   const loadHomeData = async () => {
     try {
-      const todayIso = new Date().toISOString().split('T')[0];
-      const nextYearIso = new Date(new Date().getFullYear() + 1, 11, 31).toISOString().split('T')[0];
+      const currentLocale = isAr ? 'ar' : 'en';
 
-      const [statsRes, jftRes, homeDataRes, calEventsRes] = await Promise.allSettled([
+      const [statsRes, jftRes, homeDataRes] = await Promise.allSettled([
         homeApi.getStats(),
-        homeApi.getJft(),
-        homeApi.getHomeData(),
-        homeApi.getHomeData().catch(() => null),
+        homeApi.getJft(undefined, currentLocale),
+        homeApi.getHomeData(undefined, currentLocale),
       ]);
 
       let upcomingEventsCount = 0;
@@ -126,6 +134,11 @@ export default function HomeScreen() {
         const home = homeDataRes.value;
         if (Array.isArray(home.helplines) && home.helplines.length > 0) {
           setHelplines(home.helplines);
+        }
+        if (home.hero_event) {
+          setHeroEvent(home.hero_event);
+        } else {
+          setHeroEvent(null);
         }
         if (Array.isArray(home.upcoming_events)) {
           upcomingEventsCount = home.upcoming_events.length;
@@ -152,7 +165,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadHomeData();
-  }, []);
+  }, [isAr]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -163,13 +176,16 @@ export default function HomeScreen() {
 
   const handleCall = (phoneNumber: string) => {
     haptic.selection();
-    Linking.openURL(`tel:${phoneNumber}`).catch(() => { });
+    const dialNum = formatDialerNumber(phoneNumber);
+    Linking.openURL(`tel:${dialNum}`).catch(() => { });
   };
 
   const handleWhatsApp = (whatsappNumber: string) => {
     haptic.selection();
-    const cleanNum = whatsappNumber.replace(/[^0-9]/g, '');
-    Linking.openURL(`https://wa.me/2${cleanNum}`).catch(() => { });
+    const url = formatWhatsAppUrl(whatsappNumber);
+    if (url) {
+      Linking.openURL(url).catch(() => { });
+    }
   };
 
   return (
@@ -293,6 +309,54 @@ export default function HomeScreen() {
             </AppText>
           </TouchableOpacity>
         </View>
+
+        {/* Hero Event Card (if featured in API v1) */}
+        {heroEvent && (
+          <TouchableOpacity
+            style={[
+              styles.heroEventCard,
+              shadows.card,
+              {
+                backgroundColor: isDark ? 'rgba(251, 191, 36, 0.12)' : '#fffbeb',
+                borderColor: isDark ? '#fbbf24' : '#f59e0b',
+                flexDirection: isAr ? 'row-reverse' : 'row',
+              },
+            ]}
+            onPress={() => {
+              haptic.selection();
+              router.push('/(tabs)/events');
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.heroEventIconBox, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.25)' : '#fef3c7', marginEnd: isAr ? 0 : 12, marginStart: isAr ? 12 : 0 }]}>
+              <Star size={20} color={isDark ? '#fbbf24' : '#d97706'} fill={isDark ? '#fbbf24' : '#d97706'} />
+            </View>
+            <View style={{ flex: 1, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+              <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                <Badge label={isAr ? 'فعالية بارزة' : 'Featured Event'} variant="gold" size="sm" />
+                {heroEvent.organizer ? (
+                  <AppText variant="caption" color={colors.textMuted}>
+                    {heroEvent.organizer}
+                  </AppText>
+                ) : null}
+              </View>
+              <AppText variant="label" color={colors.textPrimary} weight="800" style={{ marginTop: 2, textAlign: isAr ? 'right' : 'left' }}>
+                {heroEvent.title}
+              </AppText>
+              {heroEvent.start ? (
+                <AppText variant="caption" color={colors.textSecondary} style={{ marginTop: 2 }}>
+                  {new Date(heroEvent.start).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                  {heroEvent.location ? ` • ${heroEvent.location}` : ''}
+                </AppText>
+              ) : null}
+            </View>
+            <ArrowUpRight size={18} color={isDark ? '#fbbf24' : '#d97706'} style={{ transform: [{ scaleX: isAr ? -1 : 1 }] }} />
+          </TouchableOpacity>
+        )}
 
         {/* Quick Action Navigation Cards */}
         <View style={styles.quickLinksRow}>
@@ -460,7 +524,9 @@ export default function HomeScreen() {
                   {isAr ? item.region_ar || item.region : item.region || item.region_ar}
                 </AppText>
                 <AppText variant="caption" color={colors.textMuted} style={{ textAlign: isAr ? 'right' : 'left' }}>
-                  {isAr ? 'متاح للرد والدعم على مدار الساعة' : 'Available for fellowship support'}
+                  {isAr
+                    ? (item.hours_ar || item.hours || 'متاح للرد والدعم على مدار الساعة')
+                    : (item.hours || item.hours_ar || 'Available for fellowship support')}
                 </AppText>
               </View>
 
@@ -650,6 +716,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 10,
+  },
+  heroEventCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  heroEventIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   helplineList: {
     gap: 10,

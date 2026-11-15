@@ -194,7 +194,9 @@ export interface CalendarEvent {
   location?: string;
   recurrence?: string[] | string;
   formatted_recurrence?: string;
+  is_hero?: boolean;
   is_featured?: boolean;
+  location_info?: any;
   start_date?: string;
   end_date?: string;
   created_at?: string;
@@ -503,6 +505,7 @@ export interface FrontpageData {
   jft: JftData;
   helplines: HelplineItem[];
   social_links: SocialLinks;
+  hero_event?: CalendarEvent | null;
   upcoming_events: CalendarEvent[] | any[];
 }
 

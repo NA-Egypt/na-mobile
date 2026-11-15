@@ -32,6 +32,7 @@ import { useAppTheme } from '../theme';
 import { AppText, Badge, AppButton } from './ui';
 import { HelplineCallLoggerModal } from './HelplineCallLoggerModal';
 import { haptic } from '../utils/haptics';
+import { formatWhatsAppUrl } from '../utils/phone';
 
 interface HelplineModalProps {
   visible: boolean;
@@ -115,7 +116,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
 
       // 1. Try home/frontpage consolidated API
       try {
-        const homeData = await homeApi.getHomeData();
+        const homeData = await homeApi.getHomeData(undefined, isAr ? 'ar' : 'en');
         if (homeData?.helplines && Array.isArray(homeData.helplines) && homeData.helplines.length > 0) {
           fetchedHelplines = homeData.helplines;
         }
@@ -142,7 +143,7 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
               region: sb.en_name || sb.name || 'Area Service',
               region_ar: sb.ar_name || sb.name_ar || sb.area_name || 'منتدى أو منطقة',
               phones: sb.phone ? [sb.phone] : [],
-              whatsapp: sb.phone ? `https://wa.me/${sb.phone.replace(/[^0-9]/g, '')}` : undefined,
+              whatsapp: sb.phone ? formatWhatsAppUrl(sb.phone) : undefined,
             }));
 
           if (sbHelplines.length > 0) {
@@ -176,9 +177,11 @@ export const HelplineModal: React.FC<HelplineModalProps> = ({ visible, onClose }
     });
   };
 
-  const handleWhatsApp = (url?: string) => {
-    if (!url) return;
+  const handleWhatsApp = (target?: string) => {
+    if (!target) return;
     haptic.selection();
+    const url = formatWhatsAppUrl(target);
+    if (!url) return;
     Linking.openURL(url).catch(() => {
       Alert.alert(isAr ? 'تنبيه' : 'Notice', isAr ? 'تعذر فتح واتساب.' : 'Could not open WhatsApp.');
     });

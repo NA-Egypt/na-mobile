@@ -91,15 +91,31 @@ export class NaEgyptApiClient {
   }
 
   // Fetch Frontpage Consolidated Data
-  public async getHomeData(date?: string) {
-    const query = date ? `?date=${encodeURIComponent(date)}` : '';
-    return this.request<ApiResponse<FrontpageData>>(`/home${query}`);
+  public async getHomeData(date?: string, locale?: string) {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (locale) {
+      params.append('locale', locale);
+      params.append('lang', locale);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<ApiResponse<FrontpageData>>(`/home${query}`, {
+      headers: locale ? { 'X-Locale': locale } : undefined,
+    });
   }
 
   // Fetch Just For Today Daily Reading
-  public async getJft(date?: string) {
-    const query = date ? `?date=${encodeURIComponent(date)}` : '';
-    return this.request<ApiResponse<JftData>>(`/jft${query}`);
+  public async getJft(date?: string, locale?: string) {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (locale) {
+      params.append('locale', locale);
+      params.append('lang', locale);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<ApiResponse<JftData>>(`/jft${query}`, {
+      headers: locale ? { 'X-Locale': locale } : undefined,
+    });
   }
 
   // Fetch Public Stats
