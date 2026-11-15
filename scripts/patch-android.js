@@ -88,6 +88,20 @@ gradleFiles.forEach(gf => {
   }
 });
 
+const rnsac = 'node_modules/react-native-safe-area-context/android/build.gradle';
+if (fs.existsSync(rnsac)) {
+  let c = fs.readFileSync(rnsac, 'utf8');
+  if (!c.includes('if (project == rootProject) {') || c.indexOf('if (project == rootProject)') > c.indexOf('dependencies {')) {
+    c = c.replace(/dependencies\s*\{([\s\S]*?)classpath\("com\.android\.tools\.build:gradle:7\.3\.1"\)([\s\S]*?)\}/, (match) => {
+      if (!match.includes('if (project == rootProject) {')) {
+        return 'dependencies {\n        if (project == rootProject) {\n            classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")\n            classpath("com.android.tools.build:gradle:7.3.1")\n            classpath("com.diffplug.spotless:spotless-plugin-gradle:6.11.0")\n        }\n    }';
+      }
+      return match;
+    });
+    fs.writeFileSync(rnsac, c);
+  }
+}
+
 // 4. Patch expo-module-gradle-plugin ProjectConfiguration.kt
 const pc = 'node_modules/expo/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/ProjectConfiguration.kt';
 if (fs.existsSync(pc)) {
