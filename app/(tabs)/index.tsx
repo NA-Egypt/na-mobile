@@ -25,6 +25,7 @@ import {
   HeartHandshake,
   Navigation,
   Star,
+  BookOpen,
 } from 'lucide-react-native';
 import { AppText, Badge, AppHeader } from '../../src/components/ui';
 import { JftModal } from '../../src/components/JftModal';
@@ -486,6 +487,74 @@ export default function HomeScreen() {
             </AppText>
           </TouchableOpacity>
         </View>
+
+        {/* 10th Step Daily Inventory (معايشة البرنامج) Card */}
+        <TouchableOpacity
+          style={[
+            styles.jftCard,
+            shadows.card,
+            {
+              backgroundColor: colors.cardBg,
+              borderColor: colors.cardBorder,
+              marginTop: 14,
+            },
+          ]}
+          onPress={() => {
+            haptic.selection();
+            router.push('/daily-inventory');
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.jftHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.jftTitleRow, { flexDirection: isAr ? 'row-reverse' : 'row', flex: 1 }]}>
+              <View
+                style={[
+                  styles.jftIconCircle,
+                  {
+                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : colors.primaryLight + '25',
+                    marginEnd: isAr ? 0 : 10,
+                    marginStart: isAr ? 10 : 0,
+                  },
+                ]}
+              >
+                <BookOpen size={18} color={isDark ? '#38bdf8' : colors.primary} />
+              </View>
+              <View style={{ alignItems: isAr ? 'flex-end' : 'flex-start', flex: 1 }}>
+                <AppText variant="h3" color={colors.textPrimary} weight="800">
+                  {t('daily_inventory.card_title')}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
+                  {t('daily_inventory.card_desc')}
+                </AppText>
+              </View>
+            </View>
+            <Badge label={t('daily_inventory.banner_badge')} variant="primary" size="sm" />
+          </View>
+
+          <View
+            style={[
+              styles.jftActionBtn,
+              {
+                backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : colors.primaryLight + '20',
+                flexDirection: isAr ? 'row-reverse' : 'row',
+                marginTop: 10,
+              },
+            ]}
+          >
+            <AppText variant="label" color={isDark ? '#38bdf8' : colors.primary} weight="700">
+              {t('daily_inventory.start_today')}
+            </AppText>
+            <ArrowUpRight
+              size={16}
+              color={isDark ? '#38bdf8' : colors.primary}
+              style={{
+                marginEnd: isAr ? 6 : 0,
+                marginStart: isAr ? 0 : 6,
+                transform: [{ scaleX: isAr ? -1 : 1 }],
+              }}
+            />
+          </View>
+        </TouchableOpacity>
 
         {/* Helplines Section (خطوط المساعدة) */}
         <View style={[styles.sectionHeader, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>

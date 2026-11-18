@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -24,6 +25,8 @@ import {
   X,
   Heart,
   Quote,
+  BookOpen,
+  ArrowUpRight,
 } from 'lucide-react-native';
 import { AppText, Badge, AppButton, AppHeader } from '../../src/components/ui';
 import { useAppTheme } from '../../src/theme';
@@ -177,6 +180,7 @@ const NA_LITERATURE_QUOTES = [
 ];
 
 export default function CleantimeScreen() {
+  const router = useRouter();
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const { colors, isDark, borderRadius, shadows } = useAppTheme();
@@ -539,6 +543,68 @@ export default function CleantimeScreen() {
             — {isAr ? dailyQuote.sourceAr : dailyQuote.sourceEn}
           </AppText>
         </View>
+
+        {/* 10th Step Daily Inventory (معايشة البرنامج) Entry Card */}
+        <TouchableOpacity
+          style={[
+            styles.quoteCard,
+            shadows.card,
+            {
+              backgroundColor: colors.cardBg,
+              borderColor: colors.cardBorder,
+              marginTop: 14,
+            },
+          ]}
+          onPress={() => {
+            haptic.selection();
+            router.push('/daily-inventory');
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.quoteHeader, { flexDirection: isAr ? 'row-reverse' : 'row', justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', flex: 1 }}>
+              <BookOpen size={20} color={colors.primary} />
+              <AppText variant="label" weight="800" color={colors.primary} style={{ marginHorizontal: 8 }}>
+                {t('daily_inventory.card_title')}
+              </AppText>
+            </View>
+            <Badge label={t('daily_inventory.banner_badge')} variant="primary" size="sm" />
+          </View>
+
+          <AppText
+            variant="bodySmall"
+            color={colors.textSecondary}
+            style={{ textAlign: isAr ? 'right' : 'left', marginTop: 6, lineHeight: 20 }}
+          >
+            {t('daily_inventory.card_desc')}
+          </AppText>
+
+          <View
+            style={{
+              flexDirection: isAr ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 12,
+              paddingTop: 10,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: colors.cardBorder,
+            }}
+          >
+            <AppText variant="caption" color={colors.textMuted}>
+              {t('daily_inventory.privacy_notice')}
+            </AppText>
+            <View style={{ flexDirection: isAr ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
+              <AppText variant="labelSmall" weight="700" color={colors.primary}>
+                {t('daily_inventory.start_today')}
+              </AppText>
+              <ArrowUpRight
+                size={16}
+                color={colors.primary}
+                style={{ transform: [{ scaleX: isAr ? -1 : 1 }] }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* 5. NA Keytags & Medallions Progression */}
         <View style={styles.sectionTitleRow}>

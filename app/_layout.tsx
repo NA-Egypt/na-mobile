@@ -52,6 +52,13 @@ export default function RootLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
+            name="daily-inventory"
+            options={{
+              title: 'معايشة البرنامج • جرد الخطوة العاشرة',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="login"
             options={{
               title: 'تسجيل دخول الخدامات • Microsoft SSO',
