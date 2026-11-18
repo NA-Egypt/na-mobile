@@ -126,6 +126,33 @@ function getTodayString(): string {
   return `${year}-${month}-${day}`;
 }
 
+function getYesterdayString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function getDateChipLabel(type: 'today' | 'yesterday', isAr: boolean): string {
+  const d = new Date();
+  if (type === 'yesterday') {
+    d.setDate(d.getDate() - 1);
+  }
+  const day = d.getDate();
+  const month = isAr ? AR_MONTHS[d.getMonth()] : EN_MONTHS[d.getMonth()];
+  const formattedDate = isAr ? `${day} ${month}` : `${month} ${day}`;
+  if (type === 'today') {
+    return isAr ? `اليوم (${formattedDate})` : `Today (${formattedDate})`;
+  } else {
+    return isAr ? `أمس (${formattedDate})` : `Yesterday (${formattedDate})`;
+  }
+}
+
 export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = ({
   visible,
   onClose,
@@ -169,6 +196,7 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
   // Load Schema and Saved Draft
   useEffect(() => {
     if (visible) {
+      setCallDate(getTodayString());
       loadSchema();
       loadDraft();
     }
@@ -181,7 +209,7 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
         const draft = JSON.parse(saved);
         if (draft && typeof draft === 'object') {
           if (draft.duration) setDuration(draft.duration);
-          if (draft.callDate) setCallDate(draft.callDate);
+          // Note: callDate always defaults to today whenever user opens the form
           if (draft.callTimeShift) setCallTimeShift(draft.callTimeShift);
           if (draft.callerType) setCallerType(draft.callerType);
           if (draft.callerTypeOther) setCallerTypeOther(draft.callerTypeOther);
@@ -623,24 +651,45 @@ export const HelplineCallLoggerModal: React.FC<HelplineCallLoggerModalProps> = (
 
                 {/* Call Date */}
                 <AppText variant="label" color={colors.textSecondary} style={styles.inputLabel}>
-                  {isAr ? 'تاريخ المكالمة (YYYY-MM-DD)' : 'Call Date (YYYY-MM-DD)'}
+                  {isAr ? 'تاريخ المكالمة' : 'Call Date'}
                 </AppText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.bgPrimary,
-                      borderColor: colors.cardBorder,
-                      color: colors.textPrimary,
-                      borderRadius: borderRadius.md,
-                      textAlign: isAr ? 'right' : 'left',
-                    },
-                  ]}
-                  value={callDate}
-                  onChangeText={setCallDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textMuted}
-                />
+                <View style={[styles.chipsContainer, { flexDirection: isAr ? 'row-reverse' : 'row', marginTop: 4 }]}>
+                  {[
+                    { key: 'today', dateStr: getTodayString(), label: getDateChipLabel('today', isAr) },
+                    { key: 'yesterday', dateStr: getYesterdayString(), label: getDateChipLabel('yesterday', isAr) },
+                  ].map((item) => {
+                    const isSelected = callDate === item.dateStr;
+                    return (
+                      <TouchableOpacity
+                        key={item.key}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? colors.primary : colors.bgPrimary,
+                            borderColor: isSelected ? colors.primary : colors.cardBorder,
+                            borderRadius: borderRadius.full,
+                            flexDirection: isAr ? 'row-reverse' : 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          },
+                        ]}
+                        onPress={() => {
+                          haptic.selection();
+                          setCallDate(item.dateStr);
+                        }}
+                      >
+                        <Calendar size={13} color={isSelected ? '#ffffff' : colors.textSecondary} />
+                        <AppText
+                          variant="caption"
+                          color={isSelected ? '#ffffff' : colors.textPrimary}
+                          weight={isSelected ? '700' : '500'}
+                        >
+                          {item.label}
+                        </AppText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
                 {/* Shift Selector */}
                 <AppText variant="label" color={colors.textSecondary} style={styles.inputLabel}>
