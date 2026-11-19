@@ -94,8 +94,8 @@ android {
         applicationId 'org.naegypt.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.2.3-Hope"
+        versionCode 5
+        versionName "1.2.10-Honesty"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
